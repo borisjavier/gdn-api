@@ -1,5 +1,5 @@
 # gdn-api
 # By: Boris Javier Barrera
 
-In this application we are querying Whatsonchain multiple times to obtain details of a certain transaction and combining its results with the objective spent transaction Id (if it exists) of the output determined by our main library. 
-This API REST has the only purpose to compliment the RUN-SDK library in order to make it work properly.
+In this API we are querying Whatsonchain twice to obtain and complete the details of a certain transaction, combining the results of the first query with the objective spent transaction ID (if it exists) of the output index determined by the main library. 
+This API REST has the only purpose of complementing the RUN-SDK library to make it work properly.
