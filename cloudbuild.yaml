@@ -15,5 +15,7 @@ triggers:
   trigger_template:
     project_id: 'goldennotes-app'
     repo_name: 'gdn-api'
-    branch_name: 'your-branch-name'
+    branch_name: 'master'
+  event:
+    event_type: 'push'
   filename: 'cloudbuild.yaml'
