@@ -1,0 +1,13 @@
+{
+  "type": "service_account",
+  "project_id": "goldennotes-app",
+  "private_key_id": "3c17209fe7dcae75e7af65b36e149abfdd741d87",
+  "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQDmUbG52/Jrp8qv\nHTDwovCdVHuiiYvvF43gLZwLZlfivS0MNET8RpxTQfBwubRIy49eakNTdBkimfa8\npiaPI0kIpOEA9ikPQ4wGJ9EExkXbd5DKN7c8fHTYMji30z8bZhPbgf9/U+KN+3zS\nkHMyJDOxhdypl/x5sSs6csmwBsJeRlivNRem7lvoNzMDPE9dcGmyuoRGyw7xW9tf\nBROc4C2F1pCRXWvJtxNwfSO/P9KiY2LQLd3tgU7QNfrZM9tfq3RyfrnFOWcwttJw\nNLyodcX9AcLguBLnkhw/9zkTiaxKt3N3YzxoJXRTkR8Cy5gJTmPfNgEKsnwS1zY4\n8+Fbl1nXAgMBAAECggEAFT1Waid8f4bab0CxZf3/IEfz6NhnYhXZfK5BrcY/3flV\nIXZJue9Ap+e0s47xYov6VwCH4FCcdGKF0v4KU0WAc2TrgDbmY9gP6ydnCqb50G3o\nmWvLumIkNYwxsWrjog3m6eWSOSmngssJrUwqtQAkQww8F7W1tkeedWyAtfqn/qDj\ngdd1wd/4ObHciOnk6PEI3VA63BSCefhlKT8JWDoWnhcVoDJwA0BXWVfgbr/qkfS9\n32bvLUYwD2ry1glmgQGM10xUz3WQVoMhPbqa0RwxirIewtWfsY6VHmyblX4d98Tz\n28Ypd0+t8bd3NJP8JEp8VXyUmArNtsNG/0YBjpt6dQKBgQD8FxqHLT7Ke5k4OCCS\nowu2se5Hhu6K/PdyW0j4H/0iSkF8hBIuVgG4eWiLhwb46T2HFKmKAhkiJU2qX9cO\nMw5+CiZRVf4LKV45x5mycdoMuhGZ8d84ckd9/9vBp5dMzDDrOJDhDhCR8XwOC9En\npz61fm0yPpi2TWtcJ4Fxvs+mSwKBgQDp5CaYGBZVS02Put8Jd4QzY38tHm53cEys\n9I/siQ4T8DF1sUfksfbS92sQyWk7K1p7nraLVzJ+FpX1l03PJvF9j9zJCXNXE/qI\nld92nIexzXsGQ8eydc4WEZNi5izo0NOY80iV0epFB/2EuCLZC/4XzwZvfY5ZKXv9\n8pWwe75TJQKBgQDPYcpHDiert4ZSw4m4WD1YrIPTf+NZn8WI5CPhS5+Yx/Gbl6LF\nT6fWtLoWnpxTxL0DFTJsAFHgz0NXN8TZP5NaiMsA+nclg4Cqk9OTAypYcfHs7Rev\nfgPmWcfVRiOn4AsWVtCI9GMZTMm7XGlR77oc4MbAINLMlmANzcolYs28hQKBgQC8\ng20v7Uoi2Rzcmcumv7PID4uze/GhRtwmEr/l79lu7IuQxqChjWbZRx3+W7f7Psgh\nFx0eVduWkPGxDpBiRIsjns5fIsTaDHpDmDiSSzt7bZiYxgywpA7E7smSTt8njxjd\nEEkSqCxgEz6cuCUuN2JHIk+XkOUorC0J03oe0r3mGQKBgCaCI3vWiehm8NXqF+Am\nbVns5yAYk7ryN6x7WWaK92MY8rcOUoYbmb0/Q2tOfJxdSevL7+QxXALunFZxzwnb\naZ2g4PymeOlt8je7JxLL/gDolxg6qyL5PkfXioHMsCf32uh3S/dioqXbSAJKM0sh\nCQxquqv/97qlF35w9chZSjT9\n-----END PRIVATE KEY-----\n",
+  "client_email": "goldennotes-app@appspot.gserviceaccount.com",
+  "client_id": "107892518455761823545",
+  "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+  "token_uri": "https://oauth2.googleapis.com/token",
+  "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+  "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/goldennotes-app%40appspot.gserviceaccount.com",
+  "universe_domain": "googleapis.com"
+}
