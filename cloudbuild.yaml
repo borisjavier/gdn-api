@@ -2,13 +2,8 @@ steps:
 - name: 'gcr.io/cloud-builders/docker'
   args: ['build', '-t', 'gcr.io/goldennotes-app/goldennotes-api:latest', '.']
   env:
-       - 'GOOGLE_APPLICATION_CREDENTIALS=/goldennotes-app-d27209ff8ed.json'
+    - 'GOOGLE_APPLICATION_CREDENTIALS=/goldennotes-app-d27209ff8ed.json'
 - name: 'gcr.io/cloud-builders/docker'
   args: ['push', 'gcr.io/goldennotes-app/goldennotes-api:latest']
-- name: 'gcr.io/cloud-builders/gcloud'
-  args: ['run', 'deploy', 'goldennotes-api', '--image', 'gcr.io/goldennotes-app/goldennotes-api:latest', '--platform', 'managed', '--region', 'us-central1']
-
-images:
-- 'gcr.io/goldennotes-app/goldennotes-api:latest'
 - name: 'gcr.io/cloud-builders/gcloud'
   args: ['run', 'deploy', 'goldennotes-api', '--image', 'gcr.io/goldennotes-app/goldennotes-api:latest', '--platform', 'managed', '--region', 'us-central1']
