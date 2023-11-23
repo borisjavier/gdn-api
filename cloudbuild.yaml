@@ -10,14 +10,5 @@ steps:
 
 images:
 - 'gcr.io/goldennotes-app/goldennotes-api:latest'
-
-triggers:
-- name: 'trigger'
-  description: 'automatic deployment of compilation process everytime there are changes in the repository. '
-  trigger_template:
-    project_id: 'goldennotes-app'
-    repo_name: 'gdn-api'
-    branch_name: 'master'
-  event:
-    event_type: 'push'
-  filename: 'cloudbuild.yaml'
+- name: 'gcr.io/cloud-builders/gcloud'
+  args: ['run', 'deploy', 'goldennotes-api', '--image', 'gcr.io/goldennotes-app/goldennotes-api:latest', '--platform', 'managed', '--region', 'us-central1']
