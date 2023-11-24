@@ -10,7 +10,7 @@ app.use('/api/v1', routes);
 app.use(errorHandler);
 app.use(rateLimit);
 
-const PORT = process.env.PORT || 8080;
+const PORT = process.env.PORT;
 app.listen(PORT, () => {
   console.log(`Servidor escuchando en el puerto ${PORT}`);
 });
