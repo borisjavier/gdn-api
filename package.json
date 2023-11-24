@@ -1,7 +1,7 @@
 {
   "name": "blockchain-connection-api",
   "version": "0.0.1",
-  "description": "This api connects to WoC and/or TAAL services to query spends on certain transaction",
+  "description": "This api connects to WoC and/or TAAL services to query spends on certain transaction.",
   "dependencies": {
     "axios": "^0.21.1",
     "express": "^4.17.1",
