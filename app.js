@@ -3,7 +3,7 @@ const cors = require('cors');
 const app = express();
 const errorHandler = require('./errorhandler');
 const rateLimit = require('./ratelimit');
-const routes = require('./routes');
+const routes = require('./routes/network');
 
 app.use(cors());
 app.use('/api/v1', routes);
