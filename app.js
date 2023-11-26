@@ -7,8 +7,8 @@ const routes = require('./routes/network');
 
 app.use(cors());
 app.use('/api/v1', routes);
-app.use(errorHandler());
-app.use(rateLimit());
+app.use(errorHandler);
+app.use(rateLimit);
 
 const PORT = process.env.PORT;
 app.listen(PORT, () => {
