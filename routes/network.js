@@ -1,10 +1,8 @@
 const express = require('express');
 const axios = require('axios');
 const router = express.Router();
-const errorHandler = require('../errorhandler');
-const rateLimit = require('../ratelimit');
 
-router.get('/network/:network/txid/:txid/voutI/:voutIndex', rateLimit, async (req, res) => {
+router.get('/network/:network/txid/:txid/voutI/:voutIndex', async (req, res) => {
   try {
     const network = req.params.network || req.query.network;
     const txid = req.params.txid || req.query.txid;
