@@ -22,7 +22,7 @@ router.get('/network/:network/txid/:txid/voutI/:voutIndex', async (req, res) => 
     const tx = await getTransactionDetails(txid, voutIndex, network);
     res.status(200).json(tx);
   } catch (error) {
-    console.error('Error al llamar a la función getTransactionDetails:', error);//Corregir detalles
+    console.error('Error al llamar a la función primordial getTransactionDetails:', error);//Corregir detalles aquí
     res.status(500).json({ error: 'Error en el servidor' });
   }
 });
