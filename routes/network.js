@@ -37,6 +37,10 @@ async function getTransactionDetails(txid, voutIndex, network) {
       axios.get(url2)
     ]);
 
+    console.log('Respuesta de la consulta en URL1: ', response1.data);
+    console.log('Respuesta de la consulta en URL2: ', response2.data);
+
+
     if (response1.error) {
         throw new Error(`Error en la respuesta de whatsonchain url1: ${response1.error.message}`);
       }
