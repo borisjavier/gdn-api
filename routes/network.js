@@ -2,7 +2,7 @@ const express = require('express');
 const axios = require('axios');
 const router = express.Router();
 
-router.get('/network/:network/txid/:txid/voutI/:voutIndex', async (req, res) => {
+/*router.get('/network/:network/txid/:txid/voutI/:voutIndex', async (req, res) => {
   try {
     const network = req.params.network || req.query.network;
     const txid = req.params.txid || req.query.txid;
@@ -63,6 +63,54 @@ async function getTransactionDetails(txid, voutIndex, network) {
     console.error('Error en la obtención de los detalles de la transacción:', error);//Corregir detalles
     throw error;
   }
-}
+}*/
+
+router.get('/network/:network/txid/:txid/voutI/:voutIndex', async (req, res) => {
+  try {
+    const network = req.params.network || req.query.network;
+    const txid = req.params.txid || req.query.txid;
+    const voutIndex = req.params.voutIndex || req.query.voutIndex;
+
+    // Validar y sanitizar las entradas
+    if (!['mainnet', 'testnet'].includes(network)) {
+      throw new Error('Red no válida');
+    }
+    if (!/^[a-fA-F0-9]{64}$/.test(txid)) {
+      throw new Error('txid no válido');
+    }
+    if (!Number.isInteger(parseInt(voutIndex)) || parseInt(voutIndex) < 0) {
+      throw new Error('voutIndex no válido');
+    }
+
+    const response1 = await axios.get(`https://api.whatsonchain.com/v1/bsv/${network}/tx/hash/${txid}`);
+    console.log('Respuesta de la consulta en URL1: ', response1.data);
+
+    if (response1.error) {
+      throw new Error(`Error en la respuesta de whatsonchain url1: ${response1.error.message}`);
+    }
+
+    if (response1.status !== 200) {
+      throw new Error(`Error en la respuesta de whatsonchain url1: ${response1.status}`);
+    }
+
+    const response2 = await axios.get(`https://api.whatsonchain.com/v1/bsv/${network}/tx/${txid}/${voutIndex}/spent`);
+    console.log('Respuesta de la consulta en URL2: ', response2.data);
+
+    if (response2.error) {
+      throw new Error(`Error en la respuesta de whatsonchain url2: ${response2.error.message}`);
+    }
+
+    if (response2.status !== 200) {
+      throw new Error(`Error en la respuesta de whatsonchain url2: ${response2.status}`);
+    }
+
+    const spentTxId = response2.data.spent.txid;
+    const tx = { txid, voutIndex, spentTxId };
+    res.status(200).json(tx);
+  } catch (error) {
+    console.error('Error al llamar a la función primordial getTransactionDetails:', error);
+    res.status(500).json({ error: 'Error en el servidor' });
+  }
+});
 
 module.exports = router;
