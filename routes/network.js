@@ -67,9 +67,9 @@ async function getTransactionDetails(txid, voutIndex, network) {
 
 router.get('/network/:network/txid/:txid/voutI/:voutIndex', async (req, res) => {
   try {
-    const network = req.params.network || req.query.network;
-    const txid = req.params.txid || req.query.txid;
-    const voutIndex = req.params.voutIndex || req.query.voutIndex;
+    const network = req.params.network || req.query.network || req.body.network; //'main'; 
+    const txid = req.params.txid || req.query.txid || req.body.txid; //'a5c5b72267ea32eab1ff4c7a87da1d2c8515ddb260d88c05eb84b2c16e393e48';
+    const voutIndex = req.params.voutIndex || req.query.voutIndex || req.body.voutIndex; // 1;
 
     // Validar y sanitizar las entradas
     if (!['mainnet', 'testnet'].includes(network)) {
