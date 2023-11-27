@@ -72,7 +72,7 @@ router.get('/network/:network/txid/:txid/voutI/:voutIndex', async (req, res) => 
     const voutIndex = req.params.voutIndex || req.query.voutIndex || req.body.voutIndex; // 1;
 
     // Validar y sanitizar las entradas
-    if (!['mainnet', 'testnet'].includes(network)) {
+    if (!['main', 'test'].includes(network)) {
       throw new Error('Red no válida');
     }
     if (!/^[a-fA-F0-9]{64}$/.test(txid)) {
