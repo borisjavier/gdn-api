@@ -1,6 +1,14 @@
 const express = require('express');
+const cors = require('cors');
 const axios = require('axios');
 const app = express();
+const errorHandler = require('./errorhandler');
+const rateLimit = require('./ratelimit');
+
+app.use(cors());
+//app.use('/api/v1', routes);
+app.use(errorHandler);
+app.use(rateLimit);
 
 app.get('/network/:network/txid/:txid/voutI/:voutIndex', async (req, res) => {
   try {
