@@ -5,7 +5,7 @@ const errorHandler = require('./errorhandler');
 const rateLimit = require('./ratelimit');
 //const winston = require('winston');
 
-//app.use(rateLimit);
+app.use(rateLimit);
 app.use(errorHandler);
 
 app.get('/network/:network/txid/:txid/voutI/:voutIndex', async (req, res) => {
