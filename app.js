@@ -49,7 +49,7 @@ app.get('/network/:network/txid/:txid/voutI/:voutIndex', async (req, res) => {
       if (res2.error) {
         throw new Error(`Error en la respuesta de whatsonchain url2: ${res2.error.message}`);
       }
-      if (res2.status !== 200 && res2.status !== 404) {
+      if (res2.status !== 200) {
         throw new Error(`Error en la respuesta de whatsonchain url2: ${res2.status}`);
       }
       if (res2.status === 404) {
