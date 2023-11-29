@@ -20,7 +20,7 @@ const logger = winston.createLogger({
 
 app.get('/network/:network/txid/:txid/voutI/:voutIndex', async (req, res) => {
   try {
-    const { network, txid, voutIndex } = req.params;
+    const { network, txid, voutIndex } = { ...req.params, ...req.query, ...req.body };
 
     if (!['main', 'test'].includes(network)) {
       throw new Error('Red no válida');
