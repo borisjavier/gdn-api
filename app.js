@@ -3,6 +3,20 @@ const axios = require('axios');
 const app = express();
 const errorHandler = require('./errorhandler');
 const rateLimit = require('./ratelimit');
+const winston = require('winston');
+
+app.use(rateLimit);
+app.use(errorHandler);
+
+// Create a logger instance
+const logger = winston.createLogger({
+  level: 'info',
+  format: winston.format.simple(),
+  transports: [
+    new winston.transports.Console(),
+    new winston.transports.File({ filename: 'error.log', level: 'error' }),
+  ],
+});
 
 app.get('/network/:network/txid/:txid/voutI/:voutIndex', async (req, res) => {
   try {
