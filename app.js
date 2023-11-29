@@ -61,7 +61,7 @@ app.get('/network/:network/txid/:txid/voutI/:voutIndex', async (req, res) => {
   
   tx.vout[voutIndex].spentTxId = spentTxId;
   
-  res.status(200).send(tx);
+  res.status(200).json(tx);
   } catch (error) {
     console.error('Error al llamar a la función primordial getTransactionDetails:', error);
     res.status(500).json({ error: 'Error en el servidor' });
