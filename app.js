@@ -62,7 +62,7 @@ app.get('/network/:network/txid/:txid/voutI/:voutIndex', async (req, res) => {
         console.log('spentTxId: ', spentTxId);
       }
     } catch (err) {
-      console.log(await res2.text());
+      console.log(err);
     }
 
     tx.vout[voutIndex].spentTxId = spentTxId;
