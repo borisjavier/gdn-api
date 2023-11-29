@@ -3,40 +3,29 @@ const axios = require('axios');
 const app = express();
 const errorHandler = require('./errorhandler');
 const rateLimit = require('./ratelimit');
-const winston = require('winston');
+//const winston = require('winston');
 
 app.use(rateLimit);
 app.use(errorHandler);
 
-// Create a logger instance
-const logger = winston.createLogger({
-  level: 'info',
-  format: winston.format.simple(),
-  transports: [
-    new winston.transports.Console(),
-    new winston.transports.File({ filename: 'error.log', level: 'error' }),
-  ],
-});
-
 app.get('/network/:network/txid/:txid/voutI/:voutIndex', async (req, res) => {
   try {
-    const { network, txid, voutIndex } = { ...req.params, ...req.query, ...req.body };
-
+    const network = req.params.network || req.query.network || req.body.network; //'main'; 
+    const txid = req.params.txid || req.query.txid || req.body.txid; //'a5c5b72267ea32eab1ff4c7a87da1d2c8515ddb260d88c05eb84b2c16e393e48';
+    const voutIndex = req.params.voutIndex || req.query.voutIndex || req.body.voutIndex; // 1;
     if (!['main', 'test'].includes(network)) {
       throw new Error('Red no válida');
     }
-
     if (!/^[a-fA-F0-9]{64}$/.test(txid)) {
       throw new Error('txid no válido');
     }
-
-    const parsedVoutIndex = parseInt(voutIndex);
-    if (!Number.isInteger(parsedVoutIndex) || parsedVoutIndex < 0) {
+    if (!Number.isInteger(parseInt(voutIndex)) || parseInt(voutIndex) < 0) {
       throw new Error('voutIndex no válido');
     }
-
     const url1 = `https://api.whatsonchain.com/v1/bsv/${network}/tx/hash/${txid}`;
     const res1 = await axios.get(url1);
+    console.log('Respuesta de la consulta en URL1: ', res1.data);
+
     if (res1.error) {
       throw new Error(`Error en la respuesta de whatsonchain url1: ${res1.error.message}`);
     }
@@ -44,10 +33,16 @@ app.get('/network/:network/txid/:txid/voutI/:voutIndex', async (req, res) => {
       throw new Error(`Error en la respuesta de whatsonchain url1: ${res1.status}`);
     }
 
-    let tx = res1.data;
+    let tx;
+    try {
+      tx = res1.data;
+    } catch (error) {
+      console.log(await res1.text());
+      throw error;
+    }
 
-    const url2 = `https://api.whatsonchain.com/v1/bsv/${network}/tx/${txid}/${parsedVoutIndex}/spent`;
-    let spentTxId = null;
+    const url2 = `https://api.whatsonchain.com/v1/bsv/${network}/tx/${txid}/${voutIndex}/spent`;
+    let spentTxId = null; // Initialize spentTxId as null
     let spent;
     try {
       const res2 = await axios.get(url2);
@@ -59,18 +54,21 @@ app.get('/network/:network/txid/:txid/voutI/:voutIndex', async (req, res) => {
       }
       if (res2.status === 404) {
         spentTxId = null;
+        console.log('spentTxId: ', spentTxId);
       } else {
         spent = res2.data;
         spentTxId = spent.txid;
+        console.log('spent: ', spent);
+        console.log('spentTxId: ', spentTxId);
       }
     } catch (err) {
-      logger.error('Error en la respuesta de whatsonchain url2: ', err.message);
+      console.log(await res2.text());
     }
 
-    tx.vout[parsedVoutIndex].spentTxId = spentTxId;
+    tx.vout[voutIndex].spentTxId = spentTxId;
     res.status(200).json(tx);
   } catch (error) {
-    logger.error('Error al llamar a la función primordial getTransactionDetails:', error);
+    console.error('Error al llamar a la función primordial getTransactionDetails:', error);
     res.status(500).json({ error: 'Error en el servidor' });
   }
 });
