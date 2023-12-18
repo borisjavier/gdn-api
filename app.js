@@ -83,7 +83,7 @@ app.get('/v1/:network/state/:location/', async (req, res) => {
   const url3 = `https://api.whatsonchain.com/v1/bsv/${network}/tx/${txid}/opreturn`;
   try {
     const response = await axios.get(url3);
-    const tx = response.data;
+    const tx = response.data.hex;
     res.status(200).json(tx);
   } catch (error) {
     console.error('Error al llamar a la url3:', error);
