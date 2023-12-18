@@ -73,24 +73,25 @@ app.get('/network/:network/txid/:txid/voutI/:voutIndex', async (req, res) => {
   }
 });
 
-app.listen(8080, () => {
-  console.log('Servidor API REST escuchando en el puerto indicado');
+
+app.get('/v1/:network/state/:location/', async (req, res) => {
+  const network = req.params.network || req.query.network || req.body.network; //'main';
+  const txid_p1 = req.params.location || req.query.location || req.body.location;
+  const prec = txid_p1.split("_o");
+  let txid = prec[0];
+  let vout = prec[1];
+  const url3 = `https://api.whatsonchain.com/v1/bsv/${network}/tx/${txid}/opreturn`;
+  try {
+    const response = await axios.get(url3);
+    const tx = response.data;
+    res.status(200).json(tx);
+  } catch (error) {
+    console.error('Error al llamar a la url3:', error);
+    res.status(500).json({ error: 'Error al llamar a la API externa' });
+  }
 });
 
 
-/*const express = require('express');
-const cors = require('cors');
-const app = express();
-const errorHandler = require('./errorhandler');
-const rateLimit = require('./ratelimit');
-const routes = require('./routes/network');
-
-app.use(cors());
-app.use('/api/v1', routes);
-app.use(errorHandler);
-app.use(rateLimit);
-
-const PORT = process.env.PORT;
-app.listen(PORT, () => {
-  console.log(`Servidor escuchando en el puerto ${PORT}`);
-});*/
+app.listen(8080, () => {
+  console.log('Servidor API REST escuchando en el puerto indicado');
+});
