@@ -79,19 +79,20 @@ app.get('/v1/:network/state/:location/', async (req, res) => {
   const txid_p1 = req.params.location || req.query.location || req.body.location;
   const prec = txid_p1.split("_o");
   let txid = prec[0];
-  let vout = prec[1];
-  const url3 = `https://api.whatsonchain.com/v1/bsv/${network}/tx/${txid}/opreturn`;
-  try {
-    const response = await axios.get(url3);
-    //const tx = response.data;
-    const tx = response.data.map(obj => obj.hex);
-    res.status(200).json(tx);
-  } catch (error) {
-    console.error('Error al llamar a la url3:', error);
-    res.status(500).json({ error: 'Error al llamar a la API externa' });
-  }
+  let voutIndex = prec[1];
+    const url3 = `https://api.whatsonchain.com/v1/bsv/${network}/tx/${txid}/hex`;
+    //https://api.whatsonchain.com/v1/bsv/<network>/tx/<hash>/hex
+    try {
+      const response = await axios.get(url3);
+      const tx = response.data;
+      res.status(200).json(tx);
+    } catch (error) {
+      console.error('Error al llamar a la url3:', error);
+      res.status(500).json({ error: 'Error al llamar a la API externa' });
+    }
+  
 });
-
+//En todo caso debe existir un arreglo con height, time y hex, donde hex es 
 
 app.listen(8080, () => {
   console.log('Servidor API REST escuchando en el puerto indicado');
