@@ -85,7 +85,9 @@ app.get('/v1/:network/state/:location/', async (req, res) => {
     try {
       const response = await axios.get(url3);
       const tx = response.data;
-      res.status(200).json(tx);
+      //res.status(200).json(tx);
+      const hex = JSON.stringify(tx, null, 0).replace(/"/g, "");
+    res.status(200).send(hex);
     } catch (error) {
       console.error('Error al llamar a la url3:', error);
       res.status(500).json({ error: 'Error al llamar a la API externa' });
