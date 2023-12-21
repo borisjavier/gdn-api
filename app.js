@@ -81,9 +81,13 @@ app.get('/v1/:network/state/:location/', async (req, res) => {
   let txid = prec[0];
   let voutIndex = prec[1];
     const url3 = `https://api.whatsonchain.com/v1/bsv/${network}/tx/${txid}/hex`;
-    //https://api.whatsonchain.com/v1/bsv/<network>/tx/<hash>/hex
+    const apiKey = 'mainnet_6c81a97a917bdab017bb02cd0d98f794';
     try {
-      const response = await axios.get(url3);
+      const response = await axios.get(url3, {
+        headers: {
+          'Apikey': apiKey
+        }
+      });
       const tx = response.data;
       //res.status(200).json(tx);
       const hexArray = [tx];
