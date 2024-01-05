@@ -82,6 +82,8 @@ app.get('/v1/:network/state/:location/', async (req, res) => {
   let voutIndex = parseInt(prec[1]) - 1;
     //const url3 = `https://api.whatsonchain.com/v1/bsv/${network}/tx/${txid}/opreturn`;
     const url3 = `https://api.whatsonchain.com/v1/bsv/${network}/tx/${txid}/out/${voutIndex}/hex`
+    //https://goldennotes-api-c3s3gjywza-uc.a.run.app/v1/main/state/1786296c21416f1e5ed3ebbd95d64a9c79a39c31fd3efce3de767e2b57bfdb43_o1
+    //https://api.whatsonchain.com/v1/bsv/main/tx/1786296c21416f1e5ed3ebbd95d64a9c79a39c31fd3efce3de767e2b57bfdb43/out/0/hex
     const apiKey = 'mainnet_6c81a97a917bdab017bb02cd0d98f794';
     try {
       const response = await axios.get(url3, {
@@ -93,7 +95,8 @@ app.get('/v1/:network/state/:location/', async (req, res) => {
       //res.status(200).json(tx);
       const hexArray = tx.map(item => item.hex);
       //const hex = tx[0].hex;
-      res.status(200).json(hexArray);
+      //res.status(200).json(hexArray);
+      res.status(200).json(url3);
     } catch (error) {
       console.error('Error al llamar a la url3:', error);
       res.status(500).json({ error: 'Error al llamar a la API externa' });
