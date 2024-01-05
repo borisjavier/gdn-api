@@ -91,10 +91,16 @@ app.get('/v1/:network/state/:location/', async (req, res) => {
           'Apikey': apiKey
         }
       });
-      const tx = response.data;
+      /*const tx = response.data;
       //res.status(200).json(tx);
       const hexArray = tx.map(item => item.hex);
       //const hex = tx[0].hex;
+      res.status(200).json(hexArray);
+      Si el resultado fuera un arreglo, como en el caso de opreturn, este sería el aproach
+      */
+      const hex = response.data;
+      const hexArray = [hex]; // Envolver hex en un arreglo
+  
       res.status(200).json(hexArray);
     } catch (error) {
       console.error(`Error al llamar a la url3: (${url3}):`, error);
