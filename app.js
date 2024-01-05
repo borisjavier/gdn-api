@@ -95,10 +95,9 @@ app.get('/v1/:network/state/:location/', async (req, res) => {
       //res.status(200).json(tx);
       const hexArray = tx.map(item => item.hex);
       //const hex = tx[0].hex;
-      //res.status(200).json(hexArray);
-      res.status(200).json(url3);
+      res.status(200).json(hexArray);
     } catch (error) {
-      console.error('Error al llamar a la url3:', error);
+      console.error(`Error al llamar a la url3: (${url3}):`, error);
       res.status(500).json({ error: 'Error al llamar a la API externa' });
     }
   
