@@ -79,9 +79,9 @@ app.get('/v1/:network/state/:location/', async (req, res) => {
   const txid_p1 = req.params.location || req.query.location || req.body.location;
   const prec = txid_p1.split("_o");
   let txid = prec[0];
-  let voutIndex = prec[1];
-    //const url3 = `https://api.whatsonchain.com/v1/bsv/${network}/tx/${txid}/hex`;
-    const url3 = `https://api.whatsonchain.com/v1/bsv/${network}/tx/${txid}/opreturn`;
+  let voutIndex = parseInt(prec[1]) - 1;
+    //const url3 = `https://api.whatsonchain.com/v1/bsv/${network}/tx/${txid}/opreturn`;
+    const url3 = `https://api.whatsonchain.com/v1/bsv/${network}/tx/${txid}/out/${voutIndex}/hex`
     const apiKey = 'mainnet_6c81a97a917bdab017bb02cd0d98f794';
     try {
       const response = await axios.get(url3, {
