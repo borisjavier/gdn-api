@@ -111,7 +111,9 @@ app.get('/v1/:network/state/:location/', async (req, res) => {
 
 
 app.get('/v1/:network/script/:scriptHash/unspent/all', async (req, res) => {
-    const { network, scriptHash } = req.params;
+    const network = req.params.network || req.query.network || req.body.network;
+    const scriptHash = req.params.scriptHash || req.query.scriptHash || req.body.scriptHash;
+
     const url = `https://api.whatsonchain.com/v1/bsv/${network}/script/${scriptHash}/unspent/all`;
 
     try {
