@@ -1,0 +1,28 @@
+# cutom ignore rules
+# The order of patterns in the file matters.
+# Patterns are processed from top to bottom, and the first pattern 
+# that matches a file or directory dictates whether it is ignored or not.
+
+# Ignore specific file named "config.ini"
+config.ini
+
+# Ignore all files with a '.bak' extension
+*.bak
+
+# Ignore all files with a '.kunal' extension
+*.kunal
+
+# If you want to exempt a file, make sure the exception pattern (!) 
+# appears after the matching pattern.
+
+# Ignore all files with a '.html' extension, except 'about.html'
+*.html
+!about.html
+
+# Exclude directories
+backup
+temp/
+dist
+
+# matches any single character in a filename or directory name
+BitoUtil?.java

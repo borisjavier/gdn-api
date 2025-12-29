@@ -108,7 +108,33 @@ app.get('/v1/:network/state/:location/', async (req, res) => {
     }
   
 });
-//En todo caso debe existir un arreglo con height, time y hex, donde hex es 
+
+
+app.get('/v1/:network/script/:scriptHash/unspent/all', async (req, res) => {
+    const { network, scriptHash } = req.params;
+    const url = `https://api.whatsonchain.com/v1/bsv/${network}/script/${scriptHash}/unspent/all`;
+
+    try {
+        const response = await axios.get(url, { headers: { 'woc-api-key': WOC_API_KEY } });
+        
+        // Extraemos los resultados del nuevo formato de WoC
+        const utxos = response.data.result || [];
+
+        // Normalizamos al formato que RUN.js mapea internamente
+        // Nota: Devolvemos el array plano para que el .map() de la librería funcione igual
+        const normalized = utxos.map(u => ({
+            tx_hash: u.tx_hash,
+            tx_pos: u.tx_pos,
+            value: u.value,
+            height: u.height
+        }));
+
+        res.status(200).json(normalized);
+    } catch (error) {
+        console.error('Error en patch UTXOs:', error.message);
+        res.status(500).json({ error: 'Error al consultar UTXOs' });
+    }
+});
 
 app.listen(8080, () => {
   console.log('Servidor API REST escuchando en el puerto indicado');
