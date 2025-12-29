@@ -8,6 +8,8 @@ const rateLimit = require('./ratelimit');
 app.use(rateLimit);
 app.use(errorHandler);
 
+const WOC_API_KEY = process.env.WOC_API_KEY;
+
 app.get('/network/:network/txid/:txid/voutI/:voutIndex', async (req, res) => {
   try {
     const network = req.params.network || req.query.network || req.body.network; //'main'; 
