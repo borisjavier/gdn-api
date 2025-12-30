@@ -10,6 +10,10 @@ app.use(rateLimit);
 app.use(errorHandler);
 
 const WOC_API_KEY = process.env.WOC_API_KEY;
+
+admin.initializeApp({
+    databaseURL: "https://goldennotes-app.firebaseio.com" 
+});
 const db = admin.database();
 
 app.get('/network/:network/txid/:txid/voutI/:voutIndex', async (req, res) => {
@@ -163,6 +167,7 @@ app.get('/v1/rate/:base', async (req, res) => {
         // 3. Si no hay caché o expiró, consultar OpenExchangeRates
         console.log(`[Cache Miss] Consultando API externa para ${base}`);
         const appId = process.env.OPEN_EXCHANGE_APP_ID;
+        if (!appId) throw new Error("Falta la ID de OPENEXCHANGERATES");
         const url = `https://openexchangerates.org/api/latest.json?app_id=${appId}&base=${base}&symbols=${symbol}`;
         
         const response = await axios.get(url);
