@@ -3,12 +3,14 @@ const axios = require('axios');
 const app = express();
 const errorHandler = require('./errorhandler');
 const rateLimit = require('./ratelimit');
-//const winston = require('winston');
+const admin = require('firebase-admin');
+
 
 app.use(rateLimit);
 app.use(errorHandler);
 
 const WOC_API_KEY = process.env.WOC_API_KEY;
+const db = admin.database();
 
 app.get('/network/:network/txid/:txid/voutI/:voutIndex', async (req, res) => {
   try {
@@ -137,6 +139,55 @@ app.get('/v1/:network/script/:scriptHash/unspent/all', async (req, res) => {
     } catch (error) {
         console.error('Error en patch UTXOs:', error.message);
         res.status(500).json({ error: 'Error al consultar UTXOs' });
+    }
+});
+
+app.get('/v1/rate/:base', async (req, res) => {
+    const base = req.params.base.toUpperCase();
+    const symbol = 'XAU';
+    const cacheRef = db.ref(`rates/${base}_${symbol}`);
+    
+    try {
+        // 1. Consultar caché en Realtime Database
+        const snapshot = await cacheRef.once('value');
+        const cachedData = snapshot.val();
+        const ahora = Math.floor(Date.now() / 1000);
+        const CINCO_MINUTOS = 300;
+
+        // 2. Verificar si el caché es válido (menos de 5 minutos)
+        if (cachedData && (ahora - cachedData.timestamp) < CINCO_MINUTOS) {
+            console.log(`[Cache Hit] Sirviendo ${base} desde RTDB`);
+            return res.status(200).json({ rate: cachedData.rate, source: 'database' });
+        }
+
+        // 3. Si no hay caché o expiró, consultar OpenExchangeRates
+        console.log(`[Cache Miss] Consultando API externa para ${base}`);
+        const appId = process.env.OPEN_EXCHANGE_APP_ID;
+        const url = `https://openexchangerates.org/api/latest.json?app_id=${appId}&base=${base}&symbols=${symbol}`;
+        
+        const response = await axios.get(url);
+        const xauPrice = response.data.rates[symbol];
+        
+        // Lógica de conversión: De onza troy a gramo
+        const pricePerGram = ( (1 / xauPrice) / 31.1035 ).toFixed(2);
+
+        // 4. Actualizar Realtime Database
+        const newData = {
+            rate: parseFloat(pricePerGram),
+            timestamp: ahora
+        };
+        await cacheRef.update(newData);
+
+        res.status(200).json({ rate: newData.rate, source: 'api' });
+
+    } catch (error) {
+        console.error('Error obteniendo tasa:', error.message);
+        // Si la API falla, intentamos devolver el último dato conocido aunque sea viejo
+        const snapshot = await cacheRef.once('value');
+        if (snapshot.exists()) {
+            return res.status(200).json({ rate: snapshot.val().rate, note: 'Stale data due to API error' });
+        }
+        res.status(500).json({ error: 'No se pudo obtener la tasa' });
     }
 });
 
