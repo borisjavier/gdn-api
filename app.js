@@ -149,36 +149,34 @@ app.get('/v1/:network/script/:scriptHash/unspent/all', async (req, res) => {
 });
 
 
-// Lista maestra de monedas soportadas (para seguridad)
-const supportedCurrencies = ["PAB", "USD", "EUR", "PEN", "ARS", "CLP", "COP", "UYU", "BRL", "ZAR"];
+// Esta es tu lista base de seguridad, pero se expandirá dinámicamente
+let defaultCurrencies = ["PAB", "USD", "EUR", "PEN", "ARS", "CLP", "COP", "UYU", "BRL", "ZAR"];
 
 app.get('/v1/rates/batch', async (req, res) => {
-    // 1. Obtener símbolos de la query: /v1/rates/batch?symbols=USD,EUR,BRL
     const { symbols } = req.query;
-    
-    if (!symbols) {
-        return res.status(400).json({ error: "Debes proveer símbolos. Ejemplo: ?symbols=USD,EUR" });
-    }
+    if (!symbols) return res.status(400).json({ error: "Faltan símbolos" });
 
-    // Convertimos a arreglo: "USD,EUR" -> ["USD", "EUR"]
-    const requestedSymbols = symbols.toUpperCase().split(',');
+    const requestedSymbols = symbols.toUpperCase().split(',').map(s => s.trim());
+    const masterList = [...new Set([...defaultCurrencies, ...requestedSymbols])];
     const ahora = Math.floor(Date.now() / 1000);
     const CINCO_MINUTOS = 300;
 
     try {
-        // 2. Consultar caché global
         const snapshot = await db.ref('rates').once('value');
         const allCachedRates = snapshot.val() || {};
 
-        // 3. Verificar si el caché general expiró (usamos USD como ancla)
+        // --- LÓGICA DE DECISIÓN REFORZADA ---
         const usdCache = allCachedRates["USD_XAU"];
-        const necesitaActualizarAPI = !usdCache || (ahora - usdCache.timestamp) > CINCO_MINUTOS;
+        const cacheExpirado = !usdCache || (ahora - usdCache.timestamp) > CINCO_MINUTOS;
+        
+        // Verificamos si alguna de las monedas pedidas NO existe en el caché actual
+        const algunaMonedaFaltante = requestedSymbols.some(s => !allCachedRates[`${s}_XAU`]);
 
-        if (necesitaActualizarAPI) {
-            console.log("[Cache Miss] Consultando OXR para todas las monedas soportadas...");
+        // Si el caché expiró O si la App pide algo nuevo que no tenemos: Vamos a la API
+        if (cacheExpirado || algunaMonedaFaltante) {
+            console.log(cacheExpirado ? "[Cache Miss] Tiempo expirado" : "[New Symbol] Moneda nueva detectada");
             
-            // Siempre actualizamos todas las permitidas para aprovechar el query Premium
-            const symbolsCsv = supportedCurrencies.join(',');
+            const symbolsCsv = masterList.join(',');
             const url = `https://openexchangerates.org/api/latest.json?app_id=${process.env.OPEN_EXCHANGE_APP_ID}&base=XAU&symbols=${symbolsCsv}`;
 
             const response = await axios.get(url);
@@ -187,7 +185,7 @@ app.get('/v1/rates/batch', async (req, res) => {
             const batchUpdate = {};
             const updatedData = {};
 
-            for (const sym of supportedCurrencies) {
+            for (const sym of masterList) {
                 if (oxrRates[sym]) {
                     const currencyPerGram = Number((oxrRates[sym] / 31.1035).toFixed(4));
                     batchUpdate[`${sym}_XAU`] = {
@@ -198,10 +196,8 @@ app.get('/v1/rates/batch', async (req, res) => {
                 }
             }
 
-            // Guardar en Firebase
             await db.ref('rates').update(batchUpdate);
 
-            // Filtrar solo lo que el usuario pidió para la respuesta
             const filteredResult = {};
             requestedSymbols.forEach(s => {
                 if (updatedData[s]) filteredResult[s] = updatedData[s];
@@ -210,21 +206,18 @@ app.get('/v1/rates/batch', async (req, res) => {
             return res.status(200).json(filteredResult);
 
         } else {
-            // 4. Cache Hit: Filtrar del caché lo que el usuario pidió
-            console.log("[Cache Hit] Filtrando desde RTDB");
+            // --- CACHE HIT TOTAL ---
+            console.log("[Cache Hit] Todos los símbolos encontrados y vigentes");
             const filteredResult = {};
-            
             requestedSymbols.forEach(s => {
-                const cacheEntry = allCachedRates[`${s}_XAU`];
-                if (cacheEntry) filteredResult[s] = cacheEntry.rate;
+                filteredResult[s] = allCachedRates[`${s}_XAU`].rate;
             });
-
             return res.status(200).json(filteredResult);
         }
 
     } catch (error) {
-        console.error('Error en Batch Rates:', error.message);
-        res.status(500).json({ error: 'Error interno al obtener tasas' });
+        console.error('Error:', error.message);
+        res.status(500).json({ error: 'Error interno' });
     }
 });
 
