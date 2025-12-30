@@ -12,8 +12,10 @@ app.use(errorHandler);
 const WOC_API_KEY = process.env.WOC_API_KEY;
 
 admin.initializeApp({
+    credential: admin.credential.applicationDefault(), 
     databaseURL: "https://goldennotes-app.firebaseio.com" 
 });
+
 const db = admin.database();
 
 app.get('/network/:network/txid/:txid/voutI/:voutIndex', async (req, res) => {
@@ -146,53 +148,83 @@ app.get('/v1/:network/script/:scriptHash/unspent/all', async (req, res) => {
     }
 });
 
-app.get('/v1/rate/:base', async (req, res) => {
-    const base = req.params.base.toUpperCase();
-    const symbol = 'XAU';
-    const cacheRef = db.ref(`rates/${base}_${symbol}`);
+
+// Lista maestra de monedas soportadas (para seguridad)
+const supportedCurrencies = ["PAB", "USD", "EUR", "PEN", "ARS", "CLP", "COP", "UYU", "BRL", "ZAR"];
+
+app.get('/v1/rates/batch', async (req, res) => {
+    // 1. Obtener símbolos de la query: /v1/rates/batch?symbols=USD,EUR,BRL
+    const { symbols } = req.query;
     
+    if (!symbols) {
+        return res.status(400).json({ error: "Debes proveer símbolos. Ejemplo: ?symbols=USD,EUR" });
+    }
+
+    // Convertimos a arreglo: "USD,EUR" -> ["USD", "EUR"]
+    const requestedSymbols = symbols.toUpperCase().split(',');
+    const ahora = Math.floor(Date.now() / 1000);
+    const CINCO_MINUTOS = 300;
+
     try {
-        // 1. Consultar caché en Realtime Database
-        const snapshot = await cacheRef.once('value');
-        const cachedData = snapshot.val();
-        const ahora = Math.floor(Date.now() / 1000);
-        const CINCO_MINUTOS = 300;
+        // 2. Consultar caché global
+        const snapshot = await db.ref('rates').once('value');
+        const allCachedRates = snapshot.val() || {};
 
-        // 2. Verificar si el caché es válido (menos de 5 minutos)
-        if (cachedData && (ahora - cachedData.timestamp) < CINCO_MINUTOS) {
-            console.log(`[Cache Hit] Sirviendo ${base} desde RTDB`);
-            return res.status(200).json({ rate: cachedData.rate, source: 'database' });
+        // 3. Verificar si el caché general expiró (usamos USD como ancla)
+        const usdCache = allCachedRates["USD_XAU"];
+        const necesitaActualizarAPI = !usdCache || (ahora - usdCache.timestamp) > CINCO_MINUTOS;
+
+        if (necesitaActualizarAPI) {
+            console.log("[Cache Miss] Consultando OXR para todas las monedas soportadas...");
+            
+            // Siempre actualizamos todas las permitidas para aprovechar el query Premium
+            const symbolsCsv = supportedCurrencies.join(',');
+            const url = `https://openexchangerates.org/api/latest.json?app_id=${process.env.OPEN_EXCHANGE_APP_ID}&base=XAU&symbols=${symbolsCsv}`;
+
+            const response = await axios.get(url);
+            const oxrRates = response.data.rates;
+
+            const batchUpdate = {};
+            const updatedData = {};
+
+            for (const sym of supportedCurrencies) {
+                if (oxrRates[sym]) {
+                    const currencyPerGram = Number((oxrRates[sym] / 31.1035).toFixed(4));
+                    batchUpdate[`${sym}_XAU`] = {
+                        rate: currencyPerGram,
+                        timestamp: ahora
+                    };
+                    updatedData[sym] = currencyPerGram;
+                }
+            }
+
+            // Guardar en Firebase
+            await db.ref('rates').update(batchUpdate);
+
+            // Filtrar solo lo que el usuario pidió para la respuesta
+            const filteredResult = {};
+            requestedSymbols.forEach(s => {
+                if (updatedData[s]) filteredResult[s] = updatedData[s];
+            });
+
+            return res.status(200).json(filteredResult);
+
+        } else {
+            // 4. Cache Hit: Filtrar del caché lo que el usuario pidió
+            console.log("[Cache Hit] Filtrando desde RTDB");
+            const filteredResult = {};
+            
+            requestedSymbols.forEach(s => {
+                const cacheEntry = allCachedRates[`${s}_XAU`];
+                if (cacheEntry) filteredResult[s] = cacheEntry.rate;
+            });
+
+            return res.status(200).json(filteredResult);
         }
-
-        // 3. Si no hay caché o expiró, consultar OpenExchangeRates
-        console.log(`[Cache Miss] Consultando API externa para ${base}`);
-        const appId = process.env.OPEN_EXCHANGE_APP_ID;
-        if (!appId) throw new Error("Falta la ID de OPENEXCHANGERATES");
-        const url = `https://openexchangerates.org/api/latest.json?app_id=${appId}&base=${base}&symbols=${symbol}`;
-        
-        const response = await axios.get(url);
-        const xauPrice = response.data.rates[symbol];
-        
-        // Lógica de conversión: De onza troy a gramo
-        const pricePerGram = ( (1 / xauPrice) / 31.1035 ).toFixed(2);
-
-        // 4. Actualizar Realtime Database
-        const newData = {
-            rate: parseFloat(pricePerGram),
-            timestamp: ahora
-        };
-        await cacheRef.update(newData);
-
-        res.status(200).json({ rate: newData.rate, source: 'api' });
 
     } catch (error) {
-        console.error('Error obteniendo tasa:', error.message);
-        // Si la API falla, intentamos devolver el último dato conocido aunque sea viejo
-        const snapshot = await cacheRef.once('value');
-        if (snapshot.exists()) {
-            return res.status(200).json({ rate: snapshot.val().rate, note: 'Stale data due to API error' });
-        }
-        res.status(500).json({ error: 'No se pudo obtener la tasa' });
+        console.error('Error en Batch Rates:', error.message);
+        res.status(500).json({ error: 'Error interno al obtener tasas' });
     }
 });
 
