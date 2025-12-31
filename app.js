@@ -1,6 +1,7 @@
 const express = require('express');
 const axios = require('axios');
 const app = express();
+const cors = require('cors');
 const errorHandler = require('./errorhandler');
 const rateLimit = require('./ratelimit');
 const admin = require('firebase-admin');
@@ -8,6 +9,9 @@ const admin = require('firebase-admin');
 
 app.use(rateLimit);
 app.use(errorHandler);
+app.use(cors({
+  origin: ['https://golden-notes.io', 'https://golden-notes.com']
+}));
 
 const WOC_API_KEY = process.env.WOC_API_KEY;
 
