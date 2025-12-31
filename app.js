@@ -131,7 +131,7 @@ app.get('/v1/:network/script/:scriptHash/unspent/all', async (req, res) => {
     const url = `https://api.whatsonchain.com/v1/bsv/${network}/script/${scriptHash}/unspent/all`;
 
     try {
-        const response = await axios.get(url, { headers: { 'woc-api-key': WOC_API_KEY } });
+        const response = await axios.get(url, { headers: { 'woc-api-key': WOC_API_KEY, cache: 1e3 } });
         
         // Extraemos los resultados del nuevo formato de WoC
         const utxos = response.data.result || [];
