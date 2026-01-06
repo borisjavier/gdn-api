@@ -26,7 +26,10 @@ if (!admin.apps.length) {
 }
 
 const db = admin.database();
-const db1 = admin.firestore();
+const db1 = new admin.firestore.Firestore({
+    projectId: 'goldennotes-app', 
+    databaseId: '(default)'       
+});
 
 db1.settings({ ignoreUndefinedProperties: true });
 
