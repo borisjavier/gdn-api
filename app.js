@@ -5,6 +5,7 @@ const cors = require('cors');
 const errorHandler = require('./errorhandler');
 const rateLimit = require('./ratelimit');
 const admin = require('firebase-admin');
+const Bloom = require('./bloom.js');
 
 
 app.use(rateLimit);
@@ -133,31 +134,33 @@ app.get('/network/:network/txid/:txid/voutI/:voutIndex', async (req, res) => {
 });*/
 
 app.get('/v1/:network/state/:location', async (req, res) => {
-    try {
-        const { location } = req.params;
-        const docId = `jig-${location}`;
-        
-        // Usamos db1 que apunta a Firestore
-        const doc = await db1.collection('state').doc(docId).get();
+    const { location } = req.params;
+    const filterB64 = req.query.filter; // El string BwAAAE...
+    
+    const doc = await db1.collection('state').doc(`jig-${location}`).get();
+    if (!doc.exists) return res.status(404).send();
 
-        if (!doc.exists) {
-            return res.status(404).json({ error: 'Location not found' });
+    const state = JSON.parse(doc.data().value);
+
+    // Si hay un filtro, aplicamos la ingeniería inversa
+    if (filterB64) {
+        const filter = Bloom.fromBase64(filterB64);
+        
+        // Creamos un objeto de propiedades filtrado
+        const filteredProps = {};
+        
+        for (const key in state.props) {
+            // Si el filtro NO contiene la llave, el cliente la necesita
+            if (!Bloom.possiblyHas(filter, key)) {
+                filteredProps[key] = state.props[key];
+            }
         }
-
-        const firestoreData = doc.data();
         
-        // Parseamos el string "value" que vimos que tienes en Firestore
-        const stateObject = JSON.parse(firestoreData.value);
-
-        // Devolvemos el objeto envuelto en su location
-        res.json({
-            [location]: stateObject
-        });
-
-    } catch (error) {
-        console.error('Error sirviendo estado:', error);
-        res.status(500).send('Internal Server Error');
+        // Reemplazamos las props por las filtradas para ahorrar ancho de banda
+        state.props = filteredProps;
     }
+
+    res.json({ [location]: state });
 });
 
 
