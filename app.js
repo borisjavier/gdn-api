@@ -8,7 +8,7 @@ const admin = require('firebase-admin');
 const Bloom = require('./bloom.js');
 
 
-app.use(rateLimit);
+//app.use(rateLimit);
 app.use(errorHandler);
 app.use(cors({
   origin: ['https://golden-notes.io', 'https://golden-notes.com']
@@ -16,13 +16,19 @@ app.use(cors({
 
 const WOC_API_KEY = process.env.WOC_API_KEY;
 
-admin.initializeApp({
-    credential: admin.credential.applicationDefault(), 
-    databaseURL: "https://goldennotes-app.firebaseio.com" 
-});
+if (!admin.apps.length) {
+    admin.initializeApp({
+        credential: admin.credential.applicationDefault(),
+        // Forzamos el projectId que vimos en los logs de error
+        projectId: 'goldennotes-app', 
+        databaseURL: "https://goldennotes-app.firebaseio.com" 
+    });
+}
 
 const db = admin.database();
 const db1 = admin.firestore();
+
+db1.settings({ ignoreUndefinedProperties: true });
 
 app.get('/network/:network/txid/:txid/voutI/:voutIndex', async (req, res) => {
   try {
@@ -134,36 +140,55 @@ app.get('/network/:network/txid/:txid/voutI/:voutIndex', async (req, res) => {
 });*/
 
 app.get('/v1/:network/state/:location', async (req, res) => {
-    const { location } = req.params;
-    const filterB64 = req.query.filter; // El string BwAAAE...
-    const docId = `jig-${location}`;
+    try {
+        const { location } = req.params;
+        const filterB64 = req.query.filter;
+        const docId = `jig-${location}`;
 
-    console.log(`Buscando en Firestore: state/${docId}`);
-    
-    const doc = await db1.collection('state').doc(`jig-${location}`).get();
-    if (!doc.exists) return res.status(404).send();
-
-    const state = JSON.parse(doc.data().value);
-
-    // Si hay un filtro, aplicamos la ingeniería inversa
-    if (filterB64) {
-        const filter = Bloom.fromBase64(filterB64);
+        console.log(`[Firestore] Intentando leer: projects/goldennotes-app/databases/(default)/documents/state/${docId}`);
         
-        // Creamos un objeto de propiedades filtrado
-        const filteredProps = {};
-        
-        for (const key in state.props) {
-            // Si el filtro NO contiene la llave, el cliente la necesita
-            if (!Bloom.possiblyHas(filter, key)) {
-                filteredProps[key] = state.props[key];
+        const docRef = db1.collection('state').doc(docId);
+        const doc = await docRef.get();
+
+        if (!doc.exists) {
+            console.warn(`[Firestore] No existe el documento: ${docId}`);
+            return res.status(404).json({ error: 'Location not found' });
+        }
+
+        const rawData = doc.data();
+        if (!rawData || !rawData.value) {
+            throw new Error(`El documento ${docId} existe pero no tiene el campo 'value'`);
+        }
+
+        const state = JSON.parse(rawData.value);
+
+        // Lógica del Bloom Filter (Ingeniería Inversa)
+        if (filterB64) {
+            try {
+                const filter = Bloom.fromBase64(filterB64);
+                const filteredProps = {};
+                for (const key in state.props) {
+                    if (!Bloom.possiblyHas(filter, key)) {
+                        filteredProps[key] = state.props[key];
+                    }
+                }
+                state.props = filteredProps;
+            } catch (bloomError) {
+                console.error("Error procesando Bloom Filter, enviando estado completo:", bloomError);
             }
         }
-        
-        // Reemplazamos las props por las filtradas para ahorrar ancho de banda
-        state.props = filteredProps;
-    }
 
-    res.json({ [location]: state });
+        res.json({ [location]: state });
+
+    } catch (error) {
+        console.error('ERROR EN ENDPOINT STATE:', error);
+        // Enviamos el mensaje de error real para diagnosticar en la laptop
+        res.status(500).json({ 
+            error: 'Internal Server Error', 
+            message: error.message,
+            stack: error.stack 
+        });
+    }
 });
 
 
