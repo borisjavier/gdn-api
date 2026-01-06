@@ -136,6 +136,9 @@ app.get('/network/:network/txid/:txid/voutI/:voutIndex', async (req, res) => {
 app.get('/v1/:network/state/:location', async (req, res) => {
     const { location } = req.params;
     const filterB64 = req.query.filter; // El string BwAAAE...
+    const docId = `jig-${location}`;
+
+    console.log(`Buscando en Firestore: state/${docId}`);
     
     const doc = await db1.collection('state').doc(`jig-${location}`).get();
     if (!doc.exists) return res.status(404).send();
