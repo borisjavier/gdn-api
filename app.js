@@ -21,6 +21,7 @@ admin.initializeApp({
 });
 
 const db = admin.database();
+const db1 = admin.firestore();
 
 app.get('/network/:network/txid/:txid/voutI/:voutIndex', async (req, res) => {
   try {
@@ -96,7 +97,7 @@ app.get('/network/:network/txid/:txid/voutI/:voutIndex', async (req, res) => {
 });
 
 
-app.get('/v1/:network/state/:location/', async (req, res) => {
+/*app.get('/v1/:network/state/:location/', async (req, res) => {
   const network = req.params.network || req.query.network || req.body.network; //'main';
   const txid_p1 = req.params.location || req.query.location || req.body.location;
   const prec = txid_p1.split("_o");
@@ -120,7 +121,7 @@ app.get('/v1/:network/state/:location/', async (req, res) => {
       res.status(200).json(hexArray);
       Si el resultado fuera un arreglo, como en el caso de opreturn, este sería el aproach
       */
-      const hex = response.data;
+     /* const hex = response.data;
       const hexArray = [hex]; // Envolver hex en un arreglo
   
       res.status(200).json(hexArray);
@@ -129,6 +130,34 @@ app.get('/v1/:network/state/:location/', async (req, res) => {
       res.status(500).json({ error: 'Error al llamar a la API externa' });
     }
   
+});*/
+
+app.get('/v1/:network/state/:location', async (req, res) => {
+    try {
+        const { location } = req.params;
+        const docId = `jig-${location}`;
+        
+        // Usamos db1 que apunta a Firestore
+        const doc = await db1.collection('state').doc(docId).get();
+
+        if (!doc.exists) {
+            return res.status(404).json({ error: 'Location not found' });
+        }
+
+        const firestoreData = doc.data();
+        
+        // Parseamos el string "value" que vimos que tienes en Firestore
+        const stateObject = JSON.parse(firestoreData.value);
+
+        // Devolvemos el objeto envuelto en su location
+        res.json({
+            [location]: stateObject
+        });
+
+    } catch (error) {
+        console.error('Error sirviendo estado:', error);
+        res.status(500).send('Internal Server Error');
+    }
 });
 
 
