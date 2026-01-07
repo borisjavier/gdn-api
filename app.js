@@ -34,14 +34,26 @@ if (!admin.apps.length) {
 }
 
 const db = admin.database();
-const db1 = admin.firestore();
+
+
+let firestoreApp;
+if (!admin.apps.find(app => app.name === 'firestoreAppCR')) {
+    firestoreApp = admin.initializeApp({
+        credential: credential,
+        projectId: 'goldennotes-app'
+    }, 'firestoreAppCR');
+} else {
+    firestoreApp = admin.app('firestoreAppCR');
+}
+
+const db1 = firestoreApp.firestore();
 
 db1.settings({ 
     ignoreUndefinedProperties: true,
     preferRest: true
 });
 
-console.log("Firestore configurado en modo REST para evitar Error 7");
+console.log("RTDB (default) y Firestore (firestoreAppCR) inicializados.");
 
 app.get('/network/:network/txid/:txid/voutI/:voutIndex', async (req, res) => {
   try {
