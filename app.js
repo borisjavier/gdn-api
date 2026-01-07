@@ -3,7 +3,7 @@ const axios = require('axios');
 const app = express();
 const cors = require('cors');
 const errorHandler = require('./errorhandler');
-const rateLimit = require('./ratelimit');
+//const rateLimit = require('./ratelimit');
 const admin = require('firebase-admin');
 const Bloom = require('./bloom.js');
 
@@ -144,7 +144,7 @@ app.get('/v1/:network/state/:location', async (req, res) => {
         const filterB64 = req.query.filter;
         const docId = `jig-${location}`;
 
-        console.log(`[Firestore] Intentando leer: projects/goldennotes-app/databases/(default)/documents/state/${docId}`);
+        console.log(`[Firestore] Intentando leer prólijamente: projects/goldennotes-app/databases/(default)/documents/state/${docId}`);
         
         const docRef = db1.collection('state').doc(docId);
         const auth = await admin.credential.applicationDefault().getAccessToken();
