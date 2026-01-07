@@ -29,7 +29,6 @@ const WOC_API_KEY = process.env.WOC_API_KEY;
 if (!admin.apps.length) {
     admin.initializeApp({
         credential: credential,
-        projectId: 'goldennotes-app',
         databaseURL: "https://goldennotes-app.firebaseio.com" 
     });
 }
@@ -37,7 +36,12 @@ if (!admin.apps.length) {
 const db = admin.database();
 const db1 = admin.firestore();
 
-db1.settings({ ignoreUndefinedProperties: true });
+db1.settings({ 
+    ignoreUndefinedProperties: true,
+    preferRest: true
+});
+
+console.log("Firestore configurado en modo REST para evitar Error 7");
 
 app.get('/network/:network/txid/:txid/voutI/:voutIndex', async (req, res) => {
   try {
