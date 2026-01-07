@@ -19,17 +19,13 @@ const WOC_API_KEY = process.env.WOC_API_KEY;
 if (!admin.apps.length) {
     admin.initializeApp({
         credential: admin.credential.applicationDefault(),
-        // Forzamos el projectId que vimos en los logs de error
-        projectId: 'goldennotes-app', 
+        projectId: 'goldennotes-app',
         databaseURL: "https://goldennotes-app.firebaseio.com" 
     });
 }
 
 const db = admin.database();
-const db1 = new admin.firestore.Firestore({
-    projectId: 'goldennotes-app', 
-    databaseId: '(default)'       
-});
+const db1 = admin.firestore();
 
 db1.settings({ ignoreUndefinedProperties: true });
 
@@ -151,6 +147,8 @@ app.get('/v1/:network/state/:location', async (req, res) => {
         console.log(`[Firestore] Intentando leer: projects/goldennotes-app/databases/(default)/documents/state/${docId}`);
         
         const docRef = db1.collection('state').doc(docId);
+        const auth = await admin.credential.applicationDefault().getAccessToken();
+        console.log("Token de cuenta de servicio obtenido con éxito");
         const doc = await docRef.get();
 
         if (!doc.exists) {
