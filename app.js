@@ -7,7 +7,17 @@ const errorHandler = require('./errorhandler');
 const admin = require('firebase-admin');
 const Bloom = require('./bloom.js');
 
+const serviceAccountVar = process.env.FIREBASE_SERVICE_ACCOUNT;
+let credential;
 
+if (serviceAccountVar) {
+    const serviceAccount = JSON.parse(serviceAccountVar);
+    credential = admin.credential.cert(serviceAccount);
+    console.log("Usando credencial explícita desde JSON");
+} else {
+    credential = admin.credential.applicationDefault();
+    console.log("Usando applicationDefault");
+}
 //app.use(rateLimit);
 app.use(errorHandler);
 app.use(cors({
@@ -18,7 +28,7 @@ const WOC_API_KEY = process.env.WOC_API_KEY;
 
 if (!admin.apps.length) {
     admin.initializeApp({
-        credential: admin.credential.applicationDefault(),
+        credential: credential,
         projectId: 'goldennotes-app',
         databaseURL: "https://goldennotes-app.firebaseio.com" 
     });
