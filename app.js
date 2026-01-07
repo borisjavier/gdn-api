@@ -167,7 +167,7 @@ app.get('/v1/:network/state/:location', async (req, res) => {
         
         const docRef = db1.collection('state').doc(docId);
         const auth = await admin.credential.applicationDefault().getAccessToken();
-        console.log("Token de cuenta de servicio obtenido con éxito");
+        console.log(`Token de cuenta de servicio obtenido con éxito. ${JSON.stringify(auth)}`);
         const doc = await docRef.get();
 
         if (!doc.exists) {
