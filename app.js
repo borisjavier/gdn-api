@@ -7,17 +7,9 @@ const errorHandler = require('./errorhandler');
 const admin = require('firebase-admin');
 const Bloom = require('./bloom.js');
 
-const serviceAccountVar = process.env.FIREBASE_SERVICE_ACCOUNT;
+//const serviceAccountVar = process.env.FIREBASE_SERVICE_ACCOUNT;
 let credential;
 
-if (serviceAccountVar) {
-    const serviceAccount = JSON.parse(serviceAccountVar);
-    credential = admin.credential.cert(serviceAccount);
-    console.log("Usando credencial explícita desde JSON");
-} else {
-    credential = admin.credential.applicationDefault();
-    console.log("Usando applicationDefault");
-}
 //app.use(rateLimit);
 app.use(errorHandler);
 app.use(cors({
@@ -28,15 +20,16 @@ const WOC_API_KEY = process.env.WOC_API_KEY;
 
 if (!admin.apps.length) {
     admin.initializeApp({
-        credential: credential,
-        databaseURL: "https://goldennotes-app.firebaseio.com" 
+        credential: admin.credential.applicationDefault(), // Usa los roles que asignamos en IAM
+        databaseURL: "https://goldennotes-app.firebaseio.com",
+        projectId: 'goldennotes-app'
     });
 }
 
 const db = admin.database();
+const db1 = admin.firestore();
 
-
-let firestoreApp;
+/*let firestoreApp;
 if (!admin.apps.find(app => app.name === 'firestoreAppCR')) {
     firestoreApp = admin.initializeApp({
         credential: credential,
@@ -44,9 +37,9 @@ if (!admin.apps.find(app => app.name === 'firestoreAppCR')) {
     }, 'firestoreAppCR');
 } else {
     firestoreApp = admin.app('firestoreAppCR');
-}
+}*/
 
-const db1 = firestoreApp.firestore();
+
 
 db1.settings({ 
     ignoreUndefinedProperties: true,
