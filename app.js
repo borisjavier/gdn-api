@@ -7,9 +7,6 @@ const errorHandler = require('./errorhandler');
 const admin = require('firebase-admin');
 const Bloom = require('./bloom.js');
 
-//const serviceAccountVar = process.env.FIREBASE_SERVICE_ACCOUNT;
-let credential;
-
 //app.use(rateLimit);
 app.use(errorHandler);
 app.use(cors({
@@ -29,24 +26,12 @@ if (!admin.apps.length) {
 const db = admin.database();
 const db1 = admin.firestore();
 
-/*let firestoreApp;
-if (!admin.apps.find(app => app.name === 'firestoreAppCR')) {
-    firestoreApp = admin.initializeApp({
-        credential: credential,
-        projectId: 'goldennotes-app'
-    }, 'firestoreAppCR');
-} else {
-    firestoreApp = admin.app('firestoreAppCR');
-}*/
-
-
 
 db1.settings({ 
     ignoreUndefinedProperties: true,
     preferRest: true
 });
 
-console.log("RTDB (default) y Firestore (firestoreAppCR) inicializados.");
 
 app.get('/network/:network/txid/:txid/voutI/:voutIndex', async (req, res) => {
   try {
@@ -122,60 +107,23 @@ app.get('/network/:network/txid/:txid/voutI/:voutIndex', async (req, res) => {
 });
 
 
-/*app.get('/v1/:network/state/:location/', async (req, res) => {
-  const network = req.params.network || req.query.network || req.body.network; //'main';
-  const txid_p1 = req.params.location || req.query.location || req.body.location;
-  const prec = txid_p1.split("_o");
-  let txid = prec[0];
-  let voutIndex = parseInt(prec[1]) - 1;
-    //const url3 = `https://api.whatsonchain.com/v1/bsv/${network}/tx/${txid}/opreturn`;
-    const url3 = `https://api.whatsonchain.com/v1/bsv/${network}/tx/${txid}/out/${voutIndex}/hex`
-    //https://goldennotes-api-c3s3gjywza-uc.a.run.app/v1/main/state/1786296c21416f1e5ed3ebbd95d64a9c79a39c31fd3efce3de767e2b57bfdb43_o1
-    //https://api.whatsonchain.com/v1/bsv/main/tx/1786296c21416f1e5ed3ebbd95d64a9c79a39c31fd3efce3de767e2b57bfdb43/out/0/hex
-    
-    try {
-      const response = await axios.get(url3, {
-        headers: {
-          'woc-api-key': WOC_API_KEY
-        }
-      });
-      /*const tx = response.data;
-      //res.status(200).json(tx);
-      const hexArray = tx.map(item => item.hex);
-      //const hex = tx[0].hex;
-      res.status(200).json(hexArray);
-      Si el resultado fuera un arreglo, como en el caso de opreturn, este sería el aproach
-      */
-     /* const hex = response.data;
-      const hexArray = [hex]; // Envolver hex en un arreglo
-  
-      res.status(200).json(hexArray);
-    } catch (error) {
-      console.error(`Error al llamar a la url3: (${url3}):`, error);
-      res.status(500).json({ error: 'Error al llamar a la API externa' });
-    }
-  
-});*/
-
 app.get('/v1/:network/state/:location', async (req, res) => {
     try {
         const { location } = req.params;
         const filterB64 = req.query.filter;
         const docId = `jig-${location}`;
 
-        console.log(`[Firestore] Intentando leer prólijamente: projects/goldennotes-app/databases/(default)/documents/state/${docId}`);
+        console.log(`[Firestore] Intentando leer: projects/goldennotes-app/databases/(default)/documents/state/${docId}`);
         
         const docRef = db1.collection('state').doc(docId);
         const auth = await admin.credential.applicationDefault().getAccessToken();
-        console.log(`Token de cuenta de servicio obtenido con éxito. ${JSON.stringify(auth)}`);
         const doc = await docRef.get();
-
         if (!doc.exists) {
-            console.warn(`[Firestore] No existe el documento: ${docId}`);
-            return res.status(404).json({ error: 'Location not found' });
+            // Si no existe, no imprimas todo el error, solo un 404 rápido
+            return res.status(404).send('Not found');
         }
-
         const rawData = doc.data();
+
         if (!rawData || !rawData.value) {
             throw new Error(`El documento ${docId} existe pero no tiene el campo 'value'`);
         }
