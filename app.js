@@ -112,11 +112,8 @@ app.get('/v1/:network/state/:location', async (req, res) => {
         const { location } = req.params;
         const filterB64 = req.query.filter;
         const docId = `jig-${location}`;
-
-        console.log(`[Firestore] Intentando leer: projects/goldennotes-app/databases/(default)/documents/state/${docId}`);
         
         const docRef = db1.collection('state').doc(docId);
-        const auth = await admin.credential.applicationDefault().getAccessToken();
         const doc = await docRef.get();
         if (!doc.exists) {
             // Si no existe, no imprimas todo el error, solo un 404 rápido
