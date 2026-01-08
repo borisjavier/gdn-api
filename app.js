@@ -259,16 +259,51 @@ app.get('/v1/rates/batch', async (req, res) => {
     }
 });
 
-app.get('/balance/:address', async (req, res) => {
-    const { address } = req.params;
+app.get('/balance/:address/uid/:uid', async (req, res) => {
+    const { address, uid } = req.params;
+    //const { uid } = req.query; // Necesitamos el UID para que Functions sepa de quién es la clave
+
     try {
         const doc = await db1.collection('goldennotes').doc(address).get();
         
-        if (!doc.exists) {
-            return res.json({ balance: 0, message: "Dirección sin historial" });
+        // ESCENARIO A: El balance ya existe en nuestra base de datos rápida
+        if (doc.exists) {
+            console.log(`Saldo recuperado de caché para: ${address}`);
+            return res.json(doc.data());
         }
+
+        // ESCENARIO B: No hay historial. Es un usuario nuevo o una dirección no indexada.
+        console.log(`Primer encuentro con ${address}. Sincronizando por primera vez...`);
+
+        // Llamamos a tu Firebase Function para obtener la "verdad" de la blockchain
+        // Usamos la lógica de /mov que ya definimos
+        const functionUrl = 'https://us-central1-goldennotes-app.cloudfunctions.net/app/mov';
         
-        res.json(doc.data());
+        try {
+            const response = await axios.post(functionUrl, { uid, dir: address });
+            const dt = response.data;
+
+            if (dt && dt.balance !== undefined) {
+                const primerSaldo = {
+                    balance: dt.balance,
+                    update_count: 0,
+                    last_txid: 'initial_sync',
+                    timestamp: Date.now(),
+                    status: 'verified'
+                };
+
+                // Guardamos en Firestore para que la PRÓXIMA consulta sea instantánea
+                await db1.collection('goldennotes').doc(address).set(primerSaldo);
+
+                return res.json(primerSaldo);
+            }
+        } catch (fError) {
+            console.error("Error en sincronización inicial:", fError.message);
+            return res.status(500).json({ error: "Error al sincronizar saldo inicial con la blockchain." });
+        }
+
+        res.json({ balance: 0, message: "No se encontraron fondos en la blockchain." });
+
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
