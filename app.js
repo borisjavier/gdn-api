@@ -261,6 +261,7 @@ app.get('/v1/rates/batch', async (req, res) => {
 
 app.get('/balance/:address/uid/:uid', async (req, res) => {
     const { address, uid } = req.params;
+    console.log(`Address: ${address}, uid: ${uid}`)
     //const { uid } = req.query; // Necesitamos el UID para que Functions sepa de quién es la clave
 
     try {
