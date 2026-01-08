@@ -12,6 +12,7 @@ app.use(errorHandler);
 app.use(cors({
   origin: ['https://golden-notes.io', 'https://golden-notes.com']
 }));
+app.use(express.json());
 
 const WOC_API_KEY = process.env.WOC_API_KEY;
 
@@ -257,6 +258,100 @@ app.get('/v1/rates/batch', async (req, res) => {
         res.status(500).json({ error: 'Error interno' });
     }
 });
+
+app.get('/balance/:address', async (req, res) => {
+    const { address } = req.params;
+    try {
+        const doc = await db1.collection('goldennotes').doc(address).get();
+        
+        if (!doc.exists) {
+            return res.json({ balance: 0, message: "Dirección sin historial" });
+        }
+        
+        res.json(doc.data());
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.post('/update-balance', async (req, res) => {
+    const { emisor, receptor, amount, txid, uidEmisor, uidReceptor } = req.body;
+
+    try {
+        const batch = db1.batch();
+
+        // Procesar Emisor y Receptor
+        const direcciones = [
+            { addr: emisor, change: -amount, uid: uidEmisor },
+            { addr: receptor, change: amount, uid: uidReceptor }
+        ];
+
+        for (const item of direcciones) {
+            const ref = db1.collection('goldennotes').doc(item.addr);
+            const doc = await ref.get();
+            
+            let currentData = doc.exists ? doc.data() : { balance: 0, update_count: 0 };
+            let newCount = (currentData.update_count || 0) + 1;
+            let newBalance = currentData.balance + item.change;
+
+            // Actualizar documento maestro
+            batch.set(ref, {
+                balance: newBalance,
+                update_count: newCount,
+                last_txid: txid,
+                timestamp: Date.now()
+            }, { merge: true });
+
+            // Registrar en subcolección de historial
+            const histRef = ref.collection('history').doc(txid);
+            batch.set(histRef, {
+                type: item.change > 0 ? 'receive' : 'send',
+                amount: Math.abs(item.change),
+                timestamp: Date.now()
+            });
+
+            // Si llegamos a 5, disparamos la función de Firebase
+            if (newCount >= 5) {
+                // No usamos await aquí para no hacer esperar al cliente
+                callFirebaseBal(item.uid, item.addr);
+            }
+        }
+
+        await batch.commit();
+        res.json({ status: 'success', txid });
+
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+async function callFirebaseBal(uid, address) {
+    try {
+        const functionUrl = 'https://us-central1-goldennotes-app.cloudfunctions.net/app/mov';
+
+        console.log(`Iniciando validación profunda para UID: ${uid} en la dirección: ${address}`);
+        const response = await axios.post(functionUrl, {
+            uid: uid,
+            dir: address
+        });
+
+        // La función /mov devuelve el saldo real usando bal(vec)
+        if (response.data && response.data.balance !== undefined) {
+          const saldoReal = response.data.balance;
+            await db.collection('goldennotes').doc(address).update({
+                balance: saldoReal,
+                update_count: 0, // Reseteamos tras validación oficial
+                last_verified: admin.firestore.FieldValue.serverTimestamp(),
+                status: 'blockchain_verified'
+            });
+            console.log(`✅ Balance sincronizado con éxito para ${address}: ${saldoReal} Quarks.`);
+        }
+    } catch (err) {
+        console.error(`Error en validación profunda: ${err.message}`);
+    }
+}
+
+
 
 app.listen(8080, () => {
   console.log('Servidor API REST escuchando en el puerto indicado');
