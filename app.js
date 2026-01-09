@@ -312,29 +312,34 @@ app.get('/balance/:address/uid/:uid', async (req, res) => {
 
 app.post('/update-balance', async (req, res) => {
     const { emisor, txid, uidEmisor, transferencias } = req.body; 
-    console.log(`[UpdateBalance]: Iniciando TX: ${txid} | Emisor: ${emisor}`);
+    console.log(`[UpdateBalance]: Iniciando sincronización para TX: ${txid}`);
 
     try {
-        if (!transferencias || !Array.isArray(transferencias)) {
-            throw new Error("El cuerpo de la petición no contiene un array de transferencias válido.");
-        }
-
         const batch = db1.batch();
         let totalSalidaEmisor = 0;
 
         // 1. Procesar Receptores
         for (const tr of transferencias) {
-            console.log(`[UpdateBalance]: Procesando receptor ${tr.receptor} (+${tr.amount})`);
             totalSalidaEmisor += tr.amount;
-
             const recRef = db1.collection('goldennotes').doc(tr.receptor);
-            const recDoc = await recRef.get(); // Necesitamos await aquí para leer el estado previo
-            let recData = recDoc.exists ? recDoc.data() : { balance: 0, update_count: 0 };
+            const recDoc = await recRef.get();
             
-            let newRecCount = (recData.update_count || 0) + 1;
+            let finalRecBalance;
+            let newRecCount;
+
+            if (!recDoc.exists) {
+                console.log(`[UpdateBalance]: Receptor nuevo ${tr.receptor}. Trayendo balance FINAL de blockchain.`);
+                // El balance de blockchain ya incluye el tr.amount
+                finalRecBalance = await callFirebaseBal(tr.uidReceptor, tr.receptor, true);
+                newRecCount = 1; // Primer movimiento en Firestore
+            } else {
+                const recData = recDoc.data();
+                finalRecBalance = recData.balance + tr.amount;
+                newRecCount = (recData.update_count || 0) + 1;
+            }
 
             batch.set(recRef, {
-                balance: recData.balance + tr.amount,
+                balance: finalRecBalance,
                 update_count: newRecCount,
                 last_txid: txid,
                 timestamp: Date.now()
@@ -347,24 +352,31 @@ app.post('/update-balance', async (req, res) => {
                 timestamp: Date.now()
             });
 
-            // Disparar validación si llega al umbral
             if (newRecCount >= 5 && tr.uidReceptor) {
-                console.log(`[UpdateBalance]: Umbral alcanzado para Receptor ${tr.receptor}. Agendando validación.`);
-                // NOTA: No usamos await para no bloquear el batch, pero capturamos errores dentro de la función
                 callFirebaseBal(tr.uidReceptor, tr.receptor);
             }
         }
 
         // 2. Procesar Emisor
-        console.log(`[UpdateBalance]: Calculando salida total emisor: -${totalSalidaEmisor}`);
         const emiRef = db1.collection('goldennotes').doc(emisor);
         const emiDoc = await emiRef.get();
-        let emiData = emiDoc.exists ? emiDoc.data() : { balance: 0, update_count: 0 };
+        
+        let finalEmiBalance;
+        let newEmiCount;
 
-        let newEmiCount = (emiData.update_count || 0) + 1;
+        if (!emiDoc.exists) {
+            console.log(`[UpdateBalance]: Emisor nuevo ${emisor}. Trayendo balance FINAL de blockchain.`);
+            // El balance de blockchain ya tiene el descuento de la transacción aplicado
+            finalEmiBalance = await callFirebaseBal(uidEmisor, emisor, true);
+            newEmiCount = 1;
+        } else {
+            const emiData = emiDoc.data();
+            finalEmiBalance = emiData.balance - totalSalidaEmisor;
+            newEmiCount = (emiData.update_count || 0) + 1;
+        }
 
         batch.set(emiRef, {
-            balance: emiData.balance - totalSalidaEmisor,
+            balance: finalEmiBalance,
             update_count: newEmiCount,
             last_txid: txid,
             timestamp: Date.now()
@@ -378,51 +390,44 @@ app.post('/update-balance', async (req, res) => {
         });
 
         if (newEmiCount >= 5 && uidEmisor) {
-            console.log(`[UpdateBalance]: Umbral alcanzado para Emisor ${emisor}. Agendando validación.`);
             callFirebaseBal(uidEmisor, emisor);
         }
 
-        // 3. Commit Final
         await batch.commit();
-        console.log(`[UpdateBalance]: ✅ Batch completado con éxito para TX: ${txid}`);
-        res.json({ status: 'success', txid });
+        console.log(`[UpdateBalance]: ✅ Sincronización terminada para ${txid}`);
+        res.json({ status: 'success' });
 
     } catch (error) {
-        console.error(`[UpdateBalance]: ❌ ERROR CRÍTICO: ${error.message}`);
+        console.error(`[UpdateBalance]: ❌ Error: ${error.message}`);
         res.status(500).json({ error: error.message });
     }
 });
 
-async function callFirebaseBal(uid, address) {
+async function callFirebaseBal(uid, address, returnBalance = false) {
     try {
         const functionUrl = 'https://us-central1-goldennotes-app.cloudfunctions.net/app/mov';
-
-        console.log(`[DeepValidation]: Solicitando verdad blockchain para ${address}...`);
+        console.log(`[DeepValidation]: Consultando blockchain para ${address}...`);
         
-        const response = await axios.post(functionUrl, {
-            uid: uid,
-            dir: address
-        });
+        const response = await axios.post(functionUrl, { uid: uid, dir: address });
 
         if (response.data && response.data.balance !== undefined) {
             const saldoReal = response.data.balance;
             
-            // IMPORTANTE: Asegúrate de que db1 sea tu instancia de Firestore disponible globalmente
-            await db1.collection('goldennotes').doc(address).update({
+            // Usamos .set con merge para manejar la creación inicial de los 200 usuarios
+            await db1.collection('goldennotes').doc(address).set({
                 balance: saldoReal,
                 update_count: 0, 
                 last_verified: Date.now(),
                 status: 'blockchain_verified'
-            });
+            }, { merge: true });
             
-            console.log(`[DeepValidation]: ✅ ÉXITO. ${address} actualizado a ${saldoReal} Quarks.`);
-        } else {
-            console.warn(`[DeepValidation]: La función respondió pero no trajo balance para ${address}`);
-        }
+            console.log(`[DeepValidation]: ✅ ${address} sincronizado: ${saldoReal} Quarks.`);
+            if (returnBalance) return saldoReal;
+        } 
+        return 0; 
     } catch (err) {
-        // Log detallado para saber si falló por timeout, red o error 500
-        const errorDetail = err.response ? JSON.stringify(err.response.data) : err.message;
-        console.error(`[DeepValidation]: ❌ ERROR en ${address}: ${errorDetail}`);
+        console.error(`[DeepValidation]: ❌ Fallo en ${address}: ${err.message}`);
+        return 0;
     }
 }
 
