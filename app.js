@@ -312,28 +312,34 @@ app.get('/balance/:address/uid/:uid', async (req, res) => {
 
 app.post('/update-balance', async (req, res) => {
     const { emisor, txid, uidEmisor, transferencias } = req.body; 
-    // transferencias: [{receptor, amount, uidReceptor}, ...]
+    console.log(`[UpdateBalance]: Iniciando TX: ${txid} | Emisor: ${emisor}`);
 
     try {
+        if (!transferencias || !Array.isArray(transferencias)) {
+            throw new Error("El cuerpo de la petición no contiene un array de transferencias válido.");
+        }
+
         const batch = db1.batch();
         let totalSalidaEmisor = 0;
 
+        // 1. Procesar Receptores
         for (const tr of transferencias) {
+            console.log(`[UpdateBalance]: Procesando receptor ${tr.receptor} (+${tr.amount})`);
             totalSalidaEmisor += tr.amount;
 
-            // 1. Actualizar cada Receptor
             const recRef = db1.collection('goldennotes').doc(tr.receptor);
-            const recDoc = await recRef.get();
+            const recDoc = await recRef.get(); // Necesitamos await aquí para leer el estado previo
             let recData = recDoc.exists ? recDoc.data() : { balance: 0, update_count: 0 };
             
+            let newRecCount = (recData.update_count || 0) + 1;
+
             batch.set(recRef, {
                 balance: recData.balance + tr.amount,
-                update_count: (recData.update_count || 0) + 1,
+                update_count: newRecCount,
                 last_txid: txid,
                 timestamp: Date.now()
             }, { merge: true });
 
-            // Historial del Receptor
             batch.set(recRef.collection('history').doc(`${txid}_in`), {
                 type: 'receive',
                 amount: tr.amount,
@@ -341,24 +347,29 @@ app.post('/update-balance', async (req, res) => {
                 timestamp: Date.now()
             });
 
-            if ((recData.update_count + 1) >= 5 && tr.uidReceptor) {
+            // Disparar validación si llega al umbral
+            if (newRecCount >= 5 && tr.uidReceptor) {
+                console.log(`[UpdateBalance]: Umbral alcanzado para Receptor ${tr.receptor}. Agendando validación.`);
+                // NOTA: No usamos await para no bloquear el batch, pero capturamos errores dentro de la función
                 callFirebaseBal(tr.uidReceptor, tr.receptor);
             }
         }
 
-        // 2. Actualizar al Emisor (Una sola vez con el total)
+        // 2. Procesar Emisor
+        console.log(`[UpdateBalance]: Calculando salida total emisor: -${totalSalidaEmisor}`);
         const emiRef = db1.collection('goldennotes').doc(emisor);
         const emiDoc = await emiRef.get();
         let emiData = emiDoc.exists ? emiDoc.data() : { balance: 0, update_count: 0 };
 
+        let newEmiCount = (emiData.update_count || 0) + 1;
+
         batch.set(emiRef, {
             balance: emiData.balance - totalSalidaEmisor,
-            update_count: (emiData.update_count || 0) + 1,
+            update_count: newEmiCount,
             last_txid: txid,
             timestamp: Date.now()
         }, { merge: true });
 
-        // Historial del Emisor (Podemos registrar el desglose)
         batch.set(emiRef.collection('history').doc(`${txid}_out`), {
             type: 'send',
             total_spent: totalSalidaEmisor,
@@ -366,13 +377,18 @@ app.post('/update-balance', async (req, res) => {
             timestamp: Date.now()
         });
 
-        if ((emiData.update_count + 1) >= 5 && uidEmisor) {
+        if (newEmiCount >= 5 && uidEmisor) {
+            console.log(`[UpdateBalance]: Umbral alcanzado para Emisor ${emisor}. Agendando validación.`);
             callFirebaseBal(uidEmisor, emisor);
         }
 
+        // 3. Commit Final
         await batch.commit();
-        res.json({ status: 'success' });
+        console.log(`[UpdateBalance]: ✅ Batch completado con éxito para TX: ${txid}`);
+        res.json({ status: 'success', txid });
+
     } catch (error) {
+        console.error(`[UpdateBalance]: ❌ ERROR CRÍTICO: ${error.message}`);
         res.status(500).json({ error: error.message });
     }
 });
@@ -381,25 +397,32 @@ async function callFirebaseBal(uid, address) {
     try {
         const functionUrl = 'https://us-central1-goldennotes-app.cloudfunctions.net/app/mov';
 
-        console.log(`Iniciando validación profunda para UID: ${uid} en la dirección: ${address}`);
+        console.log(`[DeepValidation]: Solicitando verdad blockchain para ${address}...`);
+        
         const response = await axios.post(functionUrl, {
             uid: uid,
             dir: address
         });
 
-        // La función /mov devuelve el saldo real usando bal(vec)
         if (response.data && response.data.balance !== undefined) {
-          const saldoReal = response.data.balance;
-            await db.collection('goldennotes').doc(address).update({
+            const saldoReal = response.data.balance;
+            
+            // IMPORTANTE: Asegúrate de que db1 sea tu instancia de Firestore disponible globalmente
+            await db1.collection('goldennotes').doc(address).update({
                 balance: saldoReal,
-                update_count: 0, // Reseteamos tras validación oficial
-                last_verified: admin.firestore.FieldValue.serverTimestamp(),
+                update_count: 0, 
+                last_verified: Date.now(),
                 status: 'blockchain_verified'
             });
-            console.log(`✅ Balance sincronizado con éxito para ${address}: ${saldoReal} Quarks.`);
+            
+            console.log(`[DeepValidation]: ✅ ÉXITO. ${address} actualizado a ${saldoReal} Quarks.`);
+        } else {
+            console.warn(`[DeepValidation]: La función respondió pero no trajo balance para ${address}`);
         }
     } catch (err) {
-        console.error(`Error en validación profunda: ${err.message}`);
+        // Log detallado para saber si falló por timeout, red o error 500
+        const errorDetail = err.response ? JSON.stringify(err.response.data) : err.message;
+        console.error(`[DeepValidation]: ❌ ERROR en ${address}: ${errorDetail}`);
     }
 }
 
