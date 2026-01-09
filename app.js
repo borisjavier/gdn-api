@@ -311,51 +311,67 @@ app.get('/balance/:address/uid/:uid', async (req, res) => {
 });
 
 app.post('/update-balance', async (req, res) => {
-    const { emisor, receptor, amount, txid, uidEmisor, uidReceptor } = req.body;
+    const { emisor, txid, uidEmisor, transferencias } = req.body; 
+    // transferencias: [{receptor, amount, uidReceptor}, ...]
 
     try {
         const batch = db1.batch();
+        let totalSalidaEmisor = 0;
 
-        // Procesar Emisor y Receptor
-        const direcciones = [
-            { addr: emisor, change: -amount, uid: uidEmisor },
-            { addr: receptor, change: amount, uid: uidReceptor }
-        ];
+        for (const tr of transferencias) {
+            totalSalidaEmisor += tr.amount;
 
-        for (const item of direcciones) {
-            const ref = db1.collection('goldennotes').doc(item.addr);
-            const doc = await ref.get();
+            // 1. Actualizar cada Receptor
+            const recRef = db1.collection('goldennotes').doc(tr.receptor);
+            const recDoc = await recRef.get();
+            let recData = recDoc.exists ? recDoc.data() : { balance: 0, update_count: 0 };
             
-            let currentData = doc.exists ? doc.data() : { balance: 0, update_count: 0 };
-            let newCount = (currentData.update_count || 0) + 1;
-            let newBalance = currentData.balance + item.change;
-
-            // Actualizar documento maestro
-            batch.set(ref, {
-                balance: newBalance,
-                update_count: newCount,
+            batch.set(recRef, {
+                balance: recData.balance + tr.amount,
+                update_count: (recData.update_count || 0) + 1,
                 last_txid: txid,
                 timestamp: Date.now()
             }, { merge: true });
 
-            // Registrar en subcolección de historial
-            const histRef = ref.collection('history').doc(txid);
-            batch.set(histRef, {
-                type: item.change > 0 ? 'receive' : 'send',
-                amount: Math.abs(item.change),
+            // Historial del Receptor
+            batch.set(recRef.collection('history').doc(`${txid}_in`), {
+                type: 'receive',
+                amount: tr.amount,
+                from: emisor,
                 timestamp: Date.now()
             });
 
-            // Si llegamos a 5, disparamos la función de Firebase
-            if (newCount >= 5) {
-                // No usamos await aquí para no hacer esperar al cliente
-                callFirebaseBal(item.uid, item.addr);
+            if ((recData.update_count + 1) >= 5 && tr.uidReceptor) {
+                callFirebaseBal(tr.uidReceptor, tr.receptor);
             }
         }
 
-        await batch.commit();
-        res.json({ status: 'success', txid });
+        // 2. Actualizar al Emisor (Una sola vez con el total)
+        const emiRef = db1.collection('goldennotes').doc(emisor);
+        const emiDoc = await emiRef.get();
+        let emiData = emiDoc.exists ? emiDoc.data() : { balance: 0, update_count: 0 };
 
+        batch.set(emiRef, {
+            balance: emiData.balance - totalSalidaEmisor,
+            update_count: (emiData.update_count || 0) + 1,
+            last_txid: txid,
+            timestamp: Date.now()
+        }, { merge: true });
+
+        // Historial del Emisor (Podemos registrar el desglose)
+        batch.set(emiRef.collection('history').doc(`${txid}_out`), {
+            type: 'send',
+            total_spent: totalSalidaEmisor,
+            details: transferencias,
+            timestamp: Date.now()
+        });
+
+        if ((emiData.update_count + 1) >= 5 && uidEmisor) {
+            callFirebaseBal(uidEmisor, emisor);
+        }
+
+        await batch.commit();
+        res.json({ status: 'success' });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
