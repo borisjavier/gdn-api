@@ -310,7 +310,7 @@ app.get('/balance/:address/uid/:uid', async (req, res) => {
     }
 });
 
-app.post('/update-balance', async (req, res) => {
+/*app.post('/update-balance', async (req, res) => {
     const { emisor, txid, uidEmisor, transferencias } = req.body; 
     console.log(`[UpdateBalance]: Iniciando sincronización para TX: ${txid}`);
 
@@ -399,6 +399,104 @@ app.post('/update-balance', async (req, res) => {
 
     } catch (error) {
         console.error(`[UpdateBalance]: ❌ Error: ${error.message}`);
+        res.status(500).json({ error: error.message });
+    }
+});*/
+app.post('/update-balance', async (req, res) => {
+    const { emisor, txid, uidEmisor, transferencias } = req.body;
+    console.log(`[UpdateBalance]: Iniciando transacción para TX: ${txid}`);
+
+    try {
+        await db1.runTransaction(async (transaction) => {
+            // 1. PRE-LECTURA: Referencias y obtención de documentos
+            const emiRef = db1.collection('goldennotes').doc(emisor);
+            const emiDoc = await transaction.get(emiRef);
+
+            // Mapeamos los receptores para leer sus docs de una vez (opcionalmente podrías usar getAll si no estuvieras en transacción)
+            const receptorRefs = transferencias.map(tr => db1.collection('goldennotes').doc(tr.receptor));
+            const receptorDocs = await Promise.all(receptorRefs.map(ref => transaction.get(ref)));
+
+            let totalSalidaEmisor = 0;
+
+            // 2. PROCESAR RECEPTORES
+            for (let i = 0; i < transferencias.length; i++) {
+                const tr = transferencias[i];
+                const recRef = receptorRefs[i];
+                const recDoc = receptorDocs[i];
+
+                totalSalidaEmisor += tr.amount;
+                let finalRecBalance;
+                let newRecCount;
+
+                if (!recDoc.exists) {
+                    // Nota: callFirebaseBal es externa. En transacciones, lo ideal es que 
+                    // la lógica sea puramente de DB. Pero si es necesario, lo ejecutamos:
+                    const saldoBlockchain = await callFirebaseBal(tr.uidReceptor, tr.receptor, true);
+                    finalRecBalance = saldoBlockchain;
+                    newRecCount = 1;
+                } else {
+                    const recData = recDoc.data();
+                    finalRecBalance = (recData.balance || 0) + tr.amount;
+                    newRecCount = (recData.update_count || 0) + 1;
+                }
+
+                // Programar actualizaciones en la transacción
+                transaction.set(recRef, {
+                    balance: finalRecBalance,
+                    update_count: newRecCount,
+                    last_txid: txid,
+                    timestamp: Date.now()
+                }, { merge: true });
+
+                transaction.set(recRef.collection('history').doc(`${txid}_in`), {
+                    type: 'receive',
+                    amount: tr.amount,
+                    from: emisor,
+                    timestamp: Date.now()
+                });
+            }
+
+            // 3. PROCESAR EMISOR
+            let finalEmiBalance;
+            let newEmiCount;
+
+            if (!emiDoc.exists) {
+                const saldoBlockchainEmi = await callFirebaseBal(uidEmisor, emisor, true);
+                finalEmiBalance = saldoBlockchainEmi;
+                newEmiCount = 1;
+            } else {
+                const emiData = emiDoc.data();
+                finalEmiBalance = emiData.balance - totalSalidaEmisor;
+                newEmiCount = (emiData.update_count || 0) + 1;
+            }
+
+            transaction.set(emiRef, {
+                balance: finalEmiBalance,
+                update_count: newEmiCount,
+                last_txid: txid,
+                timestamp: Date.now()
+            }, { merge: true });
+
+            transaction.set(emiRef.collection('history').doc(`${txid}_out`), {
+                type: 'send',
+                total_spent: totalSalidaEmisor,
+                details: transferencias,
+                timestamp: Date.now()
+            });
+
+            // 4. VALIDACIÓN DE PROFUNDIDAD (Opcional: fuera de la transacción si es posible)
+            // Si el conteo llega a 5, disparamos la verificación post-transacción
+            if (newEmiCount >= 5 && uidEmisor) {
+                // No bloqueamos la transacción con esto, lo llamamos después
+                setImmediate(() => callFirebaseBal(uidEmisor, emisor));
+            }
+        });
+
+        console.log(`[UpdateBalance]: ✅ Transacción exitosa para ${txid}`);
+        res.json({ status: 'success' });
+
+    } catch (error) {
+        console.error(`[UpdateBalance]: ❌ Error en transacción: ${error.message}`);
         res.status(500).json({ error: error.message });
     }
 });
