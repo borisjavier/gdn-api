@@ -311,7 +311,7 @@ app.get('/balance/:address/uid/:uid', async (req, res) => {
 });
 
 
-app.post('/update-balance', async (req, res) => {
+/*app.post('/update-balance', async (req, res) => {
     const { emisor, txid, uidEmisor, transferencias } = req.body;
     console.log(`[UpdateBalance]: Iniciando transacción para TX: ${txid}`);
 
@@ -410,6 +410,123 @@ app.post('/update-balance', async (req, res) => {
 
         console.log(`[UpdateBalance]: ✅ Transacción exitosa para ${txid}`);
         res.json({ status: 'success', validated: shouldTriggerDeepValidation });
+
+    } catch (error) {
+        console.error(`[UpdateBalance]: ❌ Error en transacción: ${error.message}`);
+        res.status(500).json({ error: error.message });
+    }
+});*/
+
+/*CÓDIGO DE TEST UPDATE-BALANCE*/
+
+app.post('/update-balance', async (req, res) => {
+    const { emisor, txid, uidEmisor, transferencias } = req.body;
+    console.log(`[UpdateBalance]: Iniciando transacción para TX: ${txid}`);
+
+    // Array para guardar a todos los que necesitan validación profunda (emisor + receptores)
+    let addressesToValidate = [];
+
+    try {
+        await db1.runTransaction(async (transaction) => {
+            // 1. PRE-LECTURA
+            const emiRef = db1.collection('goldennotes').doc(emisor);
+            const emiDoc = await transaction.get(emiRef);
+
+            const receptorRefs = transferencias.map(tr => db1.collection('goldennotes').doc(tr.receptor));
+            const receptorDocs = await Promise.all(receptorRefs.map(ref => transaction.get(ref)));
+
+            let totalSalidaEmisor = 0;
+
+            // 2. PROCESAR RECEPTORES
+            for (let i = 0; i < transferencias.length; i++) {
+                const tr = transferencias[i];
+                const recRef = receptorRefs[i];
+                const recDoc = receptorDocs[i];
+
+                totalSalidaEmisor += tr.amount;
+                let finalRecBalance;
+                let newRecCount;
+
+                if (!recDoc.exists) {
+                    const saldoBlockchain = await callFirebaseBal(tr.uidReceptor, tr.receptor, true);
+                    finalRecBalance = saldoBlockchain;
+                    newRecCount = 1;
+                } else {
+                    const recData = recDoc.data();
+                    finalRecBalance = (recData.balance || 0) + tr.amount;
+                    newRecCount = (recData.update_count || 0) + 1;
+                }
+
+                // VERIFICACIÓN PARA EL RECEPTOR
+                if (newRecCount >= 5 && tr.uidReceptor) {
+                    addressesToValidate.push({ uid: tr.uidReceptor, address: tr.receptor });
+                    newRecCount = 0; // Reiniciamos contador en DB porque dispararemos validación
+                }
+
+                transaction.set(recRef, {
+                    balance: finalRecBalance,
+                    update_count: newRecCount,
+                    last_txid: txid,
+                    timestamp: Date.now()
+                }, { merge: true });
+
+                transaction.set(recRef.collection('history').doc(`${txid}_in`), {
+                    type: 'receive',
+                    amount: tr.amount,
+                    from: emisor,
+                    timestamp: Date.now()
+                });
+            }
+
+            // 3. PROCESAR EMISOR
+            let finalEmiBalance;
+            let newEmiCount;
+
+            if (!emiDoc.exists) {
+                const saldoBlockchainEmi = await callFirebaseBal(uidEmisor, emisor, true);
+                finalEmiBalance = saldoBlockchainEmi;
+                newEmiCount = 1;
+            } else {
+                const emiData = emiDoc.data();
+                finalEmiBalance = emiData.balance - totalSalidaEmisor;
+                newEmiCount = (emiData.update_count || 0) + 1;
+            }
+
+            // VERIFICACIÓN PARA EL EMISOR
+            if (newEmiCount >= 5 && uidEmisor) {
+                addressesToValidate.push({ uid: uidEmisor, address: emisor });
+                newEmiCount = 0; 
+            }
+
+            transaction.set(emiRef, {
+                balance: finalEmiBalance,
+                update_count: newEmiCount,
+                last_txid: txid,
+                timestamp: Date.now()
+            }, { merge: true });
+
+            transaction.set(emiRef.collection('history').doc(`${txid}_out`), {
+                type: 'send',
+                total_spent: totalSalidaEmisor,
+                details: transferencias,
+                timestamp: Date.now()
+            });
+        });
+
+        // 4. VALIDACIÓN POST-TRANSACCIÓN (MULTIPLE)
+        if (addressesToValidate.length > 0) {
+            console.log(`[UpdateBalance]: 🔍 Umbral alcanzado para ${addressesToValidate.length} cuenta(s).`);
+            
+            // Ejecutamos todas las validaciones pendientes. 
+            // Usamos Promise.all para que Cloud Run espere a que todas terminen.
+            await Promise.all(addressesToValidate.map(item => {
+                console.log(`[DeepValidation]: Sincronizando receptor/emisor: ${item.address}`);
+                return callFirebaseBal(item.uid, item.address);
+            }));
+        }
+
+        console.log(`[UpdateBalance]: ✅ Transacción exitosa para ${txid}`);
+        res.json({ status: 'success', validated_count: addressesToValidate.length });
 
     } catch (error) {
         console.error(`[UpdateBalance]: ❌ Error en transacción: ${error.message}`);
