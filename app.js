@@ -350,7 +350,7 @@ app.post('/update-balance', async (req, res) => {
                 }
 
                 // VERIFICACIÓN PARA EL RECEPTOR
-                if (newRecCount >= 3 && tr.uidReceptor) {
+                if (newRecCount >= 10 && tr.uidReceptor) {
                     addressesToValidate.push({ uid: tr.uidReceptor, address: tr.receptor });
                     newRecCount = 0; // Reiniciamos contador en DB porque dispararemos validación
                 }
@@ -385,7 +385,7 @@ app.post('/update-balance', async (req, res) => {
             }
 
             // VERIFICACIÓN PARA EL EMISOR
-            if (newEmiCount >= 3 && uidEmisor) {
+            if (newEmiCount >= 10 && uidEmisor) {
                 addressesToValidate.push({ uid: uidEmisor, address: emisor });
                 newEmiCount = 0; 
             }
