@@ -15,6 +15,7 @@ app.use(cors({
 app.use(express.json());
 
 const WOC_API_KEY = process.env.WOC_API_KEY;
+const TAAL_API_KEY = process.env.TAAL_API_KEY;
 
 if (!admin.apps.length) {
     admin.initializeApp({
@@ -425,6 +426,88 @@ app.post('/update-balance', async (req, res) => {
         res.status(500).json({ error: error.message });
     }
 });
+
+
+app.post('/broadcast', async (req, res) => {
+  try {
+    // 1. Estandarizar la entrada
+    // WoC suele enviar { "txhex": "..." }
+    // ARC espera { "rawTx": "..." }
+    const txHex = req.body.txhex || req.body.rawTx || req.body.hex;
+
+    if (!txHex || typeof txHex !== 'string') {
+      throw new Error('Falta el hex de la transacción (txhex)');
+    }
+
+    console.log(`[Puente] Recibiendo TX para broadcast via ARC...`);
+
+    // 2. Llamada a TAAL ARC (Teranode)
+    // Usamos axios, que ya lo tienes importado
+    const arcResponse = await axios.post(
+      'https://arc.taal.com/v1/tx',
+      { rawTx: txHex }, // Payload formateado para ARC
+      {
+        headers: {
+          'Authorization': `Bearer ${TAAL_API_KEY}`,
+          'Content-Type': 'application/json'
+        },
+        timeout: 15000 // 15s timeout
+      }
+    );
+
+    // 3. Procesar la respuesta de ARC
+    // ARC devuelve 200 OK con un JSON detallado si todo va bien.
+    const arcData = arcResponse.data;
+
+    if (arcResponse.status === 200 && arcData.txid) {
+      console.log(`✅ [Puente] Éxito ARC. TXID: ${arcData.txid}`);
+      
+      // TRUCO DE COMPATIBILIDAD:
+      // Si tus librerías esperan SOLO el string del txid (estilo WoC raw), devuélvelo así.
+      // Si esperan JSON, devuelve JSON. 
+      // WoC API estándar devuelve el txid como string plano en algunos endpoints o JSON en otros.
+      // Para máxima seguridad con librerías viejas, devolvemos el hash como string (hex).
+      
+      // Ojo: Si tus clientes esperan JSON: res.json(arcData.txid);
+      // O si esperan texto plano:
+      // res.send(arcData.txid); 
+      
+      // Vamos a devolver JSON estándar para que sea fácil de consumir:
+      return res.status(200).json(arcData.txid); 
+    } else {
+      // Caso raro donde status es 200 pero no hay txid
+      throw new Error('ARC respondió OK pero sin TXID: ' + JSON.stringify(arcData));
+    }
+
+  } catch (error) {
+    console.error('❌ [Puente] Error en Broadcast:', error.message);
+
+    // 4. Manejo de Errores detallado (Traducción de errores de ARC)
+    let errorMsg = 'Error interno en broadcast';
+    let statusCode = 500;
+
+    if (error.response) {
+      // El servidor de ARC respondió con un error (4xx, 5xx)
+      statusCode = error.response.status;
+      const arcError = error.response.data;
+      
+      // ARC suele devolver detalles en 'extraInfo' o 'title'
+      errorMsg = arcError.extraInfo || arcError.title || arcError.detail || JSON.stringify(arcError);
+      
+      console.error(`[Puente] Detalle ARC: ${errorMsg}`);
+    } else {
+      // Error de red o configuración
+      errorMsg = error.message;
+    }
+
+    // Devolvemos el error en un formato que tu frontend pueda leer
+    return res.status(statusCode).json({ 
+      error: errorMsg,
+      provider: 'TAAL-ARC-BRIDGE'
+    });
+  }
+});
+
 
 async function callFirebaseBal(uid, address, returnBalance = false) {
     try {
