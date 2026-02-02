@@ -434,6 +434,7 @@ app.post('/broadcast', async (req, res) => {
     // WoC suele enviar { "txhex": "..." }
     // ARC espera { "rawTx": "..." }
     const txHex = req.body.txhex || req.body.rawTx || req.body.hex;
+    const network = req.body.network || 'main';
 
     if (!txHex || typeof txHex !== 'string') {
       throw new Error('Falta el hex de la transacción (txhex)');
@@ -447,65 +448,51 @@ app.post('/broadcast', async (req, res) => {
       'https://arc.taal.com/v1/tx',
       { rawTx: txHex }, // Payload formateado para ARC
       {
-        headers: {
-          'Authorization': `Bearer ${TAAL_API_KEY}`,
-          'Content-Type': 'application/json'
-        },
+        headers: { 'Authorization': `Bearer ${TAAL_API_KEY}`, 'Content-Type': 'application/json' },
         timeout: 15000 // 15s timeout
       }
     );
 
+    const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
     // 3. Procesar la respuesta de ARC
     // ARC devuelve 200 OK con un JSON detallado si todo va bien.
-    const arcData = arcResponse.data;
+    const txid = arcResponse.data.txid;
 
-    if (arcResponse.status === 200 && arcData.txid) {
-      console.log(`✅ [Puente] Éxito ARC. TXID: ${arcData.txid}`);
+    let indexed = false;
+    const maxRetries = 10;
+
+    for (let i = 0; i < maxRetries; i++) {
+      try {
+        const wocCheck = await axios.get(
+          `https://api.whatsonchain.com/v1/bsv/${network}/tx/hash/${txid}`,
+          { headers: { 'woc-api-key': WOC_API_KEY } }
+        );
+
+        if (wocCheck.status === 200 && wocCheck.data.txid) {
+          indexed = true;
+          console.log(`✅ [WoC] TX indexada correctamente en el intento ${i + 1}`);
+          break; // Salimos del bucle si lo encontramos
+        }
+      } catch (err) {
+        // Si da 404 es que WoC aún no la ve, simplemente esperamos
+        console.log(`... [Intento ${i + 1}] WoC aún no ve la TX, reintentando en 1s...`);
+      }
       
-      // TRUCO DE COMPATIBILIDAD:
-      // Si tus librerías esperan SOLO el string del txid (estilo WoC raw), devuélvelo así.
-      // Si esperan JSON, devuelve JSON. 
-      // WoC API estándar devuelve el txid como string plano en algunos endpoints o JSON en otros.
-      // Para máxima seguridad con librerías viejas, devolvemos el hash como string (hex).
-      
-      // Ojo: Si tus clientes esperan JSON: res.json(arcData.txid);
-      // O si esperan texto plano:
-      // res.send(arcData.txid); 
-      
-      // Vamos a devolver JSON estándar para que sea fácil de consumir:
-      //return res.status(200).json(arcData.txid); 
-      return res.status(200).send(arcData.txid);
-    } else {
-      // Caso raro donde status es 200 pero no hay txid
-      throw new Error('ARC respondió OK pero sin TXID: ' + JSON.stringify(arcData));
+      await sleep(1000); // Esperar 1 segundo antes del siguiente intento
     }
 
-  } catch (error) {
-    console.error('❌ [Puente] Error en Broadcast:', error.message);
-
-    // 4. Manejo de Errores detallado (Traducción de errores de ARC)
-    let errorMsg = 'Error interno en broadcast';
-    let statusCode = 500;
-
-    if (error.response) {
-      // El servidor de ARC respondió con un error (4xx, 5xx)
-      statusCode = error.response.status;
-      const arcError = error.response.data;
-      
-      // ARC suele devolver detalles en 'extraInfo' o 'title'
-      errorMsg = arcError.extraInfo || arcError.title || arcError.detail || JSON.stringify(arcError);
-      
-      console.error(`[Puente] Detalle ARC: ${errorMsg}`);
-    } else {
-      // Error de red o configuración
-      errorMsg = error.message;
+    if (!indexed) {
+      console.warn(`⚠️ [Timeout] La TX se envió pero WoC está tardando más de 10s en indexar.`);
+      // Aun así devolvemos el TXID, porque la TX es válida en ARC.
     }
 
-    // Devolvemos el error en un formato que tu frontend pueda leer
-    return res.status(statusCode).json({ 
-      error: errorMsg,
-      provider: 'TAAL-ARC-BRIDGE'
-    });
+    return res.status(200).send(txid);
+
+    } catch (error) {
+    console.error('❌ Error en Broadcast/Poll:', error.message);
+    const statusCode = error.response ? error.response.status : 500;
+    res.status(statusCode).json({ error: error.message });
   }
 });
 
