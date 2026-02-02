@@ -473,7 +473,8 @@ app.post('/broadcast', async (req, res) => {
       // res.send(arcData.txid); 
       
       // Vamos a devolver JSON estándar para que sea fácil de consumir:
-      return res.status(200).json(arcData.txid); 
+      //return res.status(200).json(arcData.txid); 
+      return res.status(200).send(arcData.txid);
     } else {
       // Caso raro donde status es 200 pero no hay txid
       throw new Error('ARC respondió OK pero sin TXID: ' + JSON.stringify(arcData));
