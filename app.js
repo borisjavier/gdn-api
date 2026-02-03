@@ -469,7 +469,7 @@ app.post('/broadcast', async (req, res) => {
       await sleep(2000);
         for (let i = 0; i < maxRetries; i++) {
 
-        try {
+        //try {
             const wocCheck = await axios.get(
                 `https://api.whatsonchain.com/v1/bsv/${network}/tx/hash/${txid}`,
                 { headers: { 'woc-api-key': WOC_API_KEY } }
@@ -479,10 +479,10 @@ app.post('/broadcast', async (req, res) => {
             indexed = true;
             console.log(`✅ [WoC] TX indexada correctamente en el intento ${i + 1}`);
             break; // Salimos del bucle si lo encontramos
-            }
-          } catch (err) {
-                console.log(`... [Intento ${i + 1}] WoC aún no ve la TX, reintentando en 1s... DataTxid: https://api.whatsonchain.com/v1/bsv/${network}/tx/hash/${txid}`);
-          }
+            } else {console.log(`... [Intento ${i + 1}]. DataTxid: https://api.whatsonchain.com/v1/bsv/${network}/tx/hash/${txid} ...`);}
+          /*} catch (err) {
+                console.log(`... [Intento ${i + 1}] WoC aún no ve la TX, reintentando en 1s...`);
+          }*/
         await sleep(1000); // Esperar 1 segundo antes del siguiente intento
 
         }
