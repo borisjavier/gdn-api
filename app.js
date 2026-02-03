@@ -463,15 +463,17 @@ app.post('/broadcast', async (req, res) => {
 
     if (arcResponse.status === 200 && arcData.txid) {
       console.log(`✅ [Puente] Éxito ARC. TXID: ${arcData.txid}`);
-      const txid = arcResponse.txid      
+      const txid = arcData.txid      
       let indexed = false;
       const maxRetries = 10;
       await sleep(1000);
         for (let i = 0; i < maxRetries; i++) {
 
         try {
+            const wocUrl = `https://api.whatsonchain.com/v1/bsv/${network}/tx/hash/${txid}`;
+            console.log(`🔍 [Intento ${i + 1}] Consultando WoC: ${wocUrl}`);
             const wocCheck = await axios.get(
-                `https://api.whatsonchain.com/v1/bsv/${network}/tx/hash/${txid}`,
+                wocUrl,
                 { headers: { 'woc-api-key': WOC_API_KEY } }
             );
 
