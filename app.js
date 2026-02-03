@@ -466,7 +466,7 @@ app.post('/broadcast', async (req, res) => {
       const txid = arcResponse.txid      
       let indexed = false;
       const maxRetries = 10;
-      await sleep(2000);
+      await sleep(1000);
         for (let i = 0; i < maxRetries; i++) {
 
         try {
@@ -475,16 +475,15 @@ app.post('/broadcast', async (req, res) => {
                 { headers: { 'woc-api-key': WOC_API_KEY } }
             );
 
-            if (wocCheck.status === 200) {
-            indexed = true;
-            const wocStuff = wocCheck.data.txid || wocCheck.txid; 
-            console.log(`✅ [WoC] TX indexada correctamente en el intento ${i + 1}. TXID: ${wocStuff}`);
-            break; // Salimos del bucle si lo encontramos
-            } else {console.log(`... DataTxid: https://api.whatsonchain.com/v1/bsv/${network}/tx/hash/${txid} ...`);}
+            if (wocCheck.status === 200 && wocCheck.data && wocCheck.data.txid) {
+                indexed = true;
+                console.log(`✅ [WoC] TX indexada en intento ${i + 1}`);
+                break;
+            }
           } catch (err) {
                 console.log(`... [Intento ${i + 1}] WoC aún no ve la TX, reintentando en 1s...`);
           }
-        await sleep(5000); // Esperar 1 segundo antes del siguiente intento
+        await sleep(1000); // Esperar 1 segundo antes del siguiente intento
 
         }
 
