@@ -466,7 +466,7 @@ app.post('/broadcast', async (req, res) => {
       const txid = arcData.txid      
       let indexed = false;
       const maxRetries = 10;
-      await sleep(1000);
+      await sleep(500);
         for (let i = 0; i < maxRetries; i++) {
 
         try {
