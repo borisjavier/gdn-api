@@ -477,13 +477,14 @@ app.post('/broadcast', async (req, res) => {
 
             if (wocCheck.status === 200) {
             indexed = true;
-            console.log(`✅ [WoC] TX indexada correctamente en el intento ${i + 1}.  Txid: ${wocCheck.txid}`);
+            const wocStuff = wocCheck.data.txid || wocCheck.txid; 
+            console.log(`✅ [WoC] TX indexada correctamente en el intento ${i + 1}. TXID: ${wocStuff}`);
             break; // Salimos del bucle si lo encontramos
             } else {console.log(`... DataTxid: https://api.whatsonchain.com/v1/bsv/${network}/tx/hash/${txid} ...`);}
           } catch (err) {
                 console.log(`... [Intento ${i + 1}] WoC aún no ve la TX, reintentando en 1s...`);
           }
-        await sleep(1000); // Esperar 1 segundo antes del siguiente intento
+        await sleep(5000); // Esperar 1 segundo antes del siguiente intento
 
         }
 
