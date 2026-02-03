@@ -475,9 +475,9 @@ app.post('/broadcast', async (req, res) => {
                 { headers: { 'woc-api-key': WOC_API_KEY } }
             );
 
-            if (wocCheck.status === 200 && wocCheck.data.txid) {
+            if (wocCheck.status === 200) {
             indexed = true;
-            console.log(`✅ [WoC] TX indexada correctamente en el intento ${i + 1}`);
+            console.log(`✅ [WoC] TX indexada correctamente en el intento ${i + 1}.  Txid: ${wocCheck.txid}`);
             break; // Salimos del bucle si lo encontramos
             } else {console.log(`... DataTxid: https://api.whatsonchain.com/v1/bsv/${network}/tx/hash/${txid} ...`);}
           } catch (err) {
