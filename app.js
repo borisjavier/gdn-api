@@ -427,6 +427,7 @@ app.post('/update-balance', async (req, res) => {
     }
 });
 
+const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
 app.post('/broadcast', async (req, res) => {
   try {
@@ -448,51 +449,80 @@ app.post('/broadcast', async (req, res) => {
       'https://arc.taal.com/v1/tx',
       { rawTx: txHex }, // Payload formateado para ARC
       {
-        headers: { 'Authorization': `Bearer ${TAAL_API_KEY}`, 'Content-Type': 'application/json' },
+        headers: {
+          'Authorization': `Bearer ${TAAL_API_KEY}`,
+          'Content-Type': 'application/json'
+        },
         timeout: 15000 // 15s timeout
       }
     );
 
-    const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
-
     // 3. Procesar la respuesta de ARC
     // ARC devuelve 200 OK con un JSON detallado si todo va bien.
-    const txid = arcResponse.data.txid;
+    const arcData = arcResponse.data;
 
-    let indexed = false;
-    const maxRetries = 10;
+    if (arcResponse.status === 200 && arcData.txid) {
+      console.log(`✅ [Puente] Éxito ARC. TXID: ${arcData.txid}`);
+      const txid = arcResponse.txid      
+      let indexed = false;
+      const maxRetries = 10;
 
-    for (let i = 0; i < maxRetries; i++) {
-      try {
-        const wocCheck = await axios.get(
-          `https://api.whatsonchain.com/v1/bsv/${network}/tx/hash/${txid}`,
-          { headers: { 'woc-api-key': WOC_API_KEY } }
-        );
+        for (let i = 0; i < maxRetries; i++) {
 
-        if (wocCheck.status === 200 && wocCheck.data.txid) {
-          indexed = true;
-          console.log(`✅ [WoC] TX indexada correctamente en el intento ${i + 1}`);
-          break; // Salimos del bucle si lo encontramos
+        try {
+            const wocCheck = await axios.get(
+                `https://api.whatsonchain.com/v1/bsv/${network}/tx/hash/${txid}`,
+                { headers: { 'woc-api-key': WOC_API_KEY } }
+            );
+
+            if (wocCheck.status === 200 && wocCheck.data.txid) {
+            indexed = true;
+            console.log(`✅ [WoC] TX indexada correctamente en el intento ${i + 1}`);
+            break; // Salimos del bucle si lo encontramos
+            }
+        } catch (err) {
+            console.log(`... [Intento ${i + 1}] WoC aún no ve la TX, reintentando en 1s...`);
         }
-      } catch (err) {
-        // Si da 404 es que WoC aún no la ve, simplemente esperamos
-        console.log(`... [Intento ${i + 1}] WoC aún no ve la TX, reintentando en 1s...`);
+        await sleep(1000); // Esperar 1 segundo antes del siguiente intento
+
+        }
+
+      if (!indexed) {
+        console.warn(`⚠️ [Timeout] WoC no indexó a tiempo, pero la TX fue enviada.`);
       }
+
+      return res.status(200).send(arcData.txid);
+    } else {
+      // Caso raro donde status es 200 pero no hay txid
+      throw new Error('ARC respondió OK pero sin TXID: ' + JSON.stringify(arcData));
+    }
+
+  } catch (error) {
+    console.error('❌ [Puente] Error en Broadcast:', error.message);
+
+    // 4. Manejo de Errores detallado (Traducción de errores de ARC)
+    let errorMsg = 'Error interno en broadcast';
+    let statusCode = 500;
+
+    if (error.response) {
+      // El servidor de ARC respondió con un error (4xx, 5xx)
+      statusCode = error.response.status;
+      const arcError = error.response.data;
       
-      await sleep(1000); // Esperar 1 segundo antes del siguiente intento
+      // ARC suele devolver detalles en 'extraInfo' o 'title'
+      errorMsg = arcError.extraInfo || arcError.title || arcError.detail || JSON.stringify(arcError);
+      
+      console.error(`[Puente] Detalle ARC: ${errorMsg}`);
+    } else {
+      // Error de red o configuración
+      errorMsg = error.message;
     }
 
-    if (!indexed) {
-      console.warn(`⚠️ [Timeout] La TX se envió pero WoC está tardando más de 10s en indexar.`);
-      // Aun así devolvemos el TXID, porque la TX es válida en ARC.
-    }
-
-    return res.status(200).send(txid);
-
-    } catch (error) {
-    console.error('❌ Error en Broadcast/Poll:', error.message);
-    const statusCode = error.response ? error.response.status : 500;
-    res.status(statusCode).json({ error: error.message });
+    // Devolvemos el error en un formato que tu frontend pueda leer
+    return res.status(statusCode).json({ 
+      error: errorMsg,
+      provider: 'TAAL-ARC-BRIDGE'
+    });
   }
 });
 
