@@ -13,6 +13,8 @@ app.use(cors({
   origin: ['https://golden-notes.io', 'https://golden-notes.com']
 }));
 app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ limit: '10mb', extended: true }));
 
 const WOC_API_KEY = process.env.WOC_API_KEY;
 const TAAL_API_KEY = process.env.TAAL_API_KEY;
