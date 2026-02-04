@@ -1,20 +1,23 @@
 const express = require('express');
 const axios = require('axios');
-const app = express();
 const cors = require('cors');
 const errorHandler = require('./errorhandler');
 //const rateLimit = require('./ratelimit');
 const admin = require('firebase-admin');
 const Bloom = require('./bloom.js');
 
-//app.use(rateLimit);
-app.use(errorHandler);
+const app = express();
+
 app.use(cors({
   origin: ['https://golden-notes.io', 'https://golden-notes.com']
 }));
-app.use(express.json());
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ limit: '10mb', extended: true }));
+
+
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
+
+//app.use(rateLimit);
+app.use(errorHandler);
 
 const WOC_API_KEY = process.env.WOC_API_KEY;
 const TAAL_API_KEY = process.env.TAAL_API_KEY;
