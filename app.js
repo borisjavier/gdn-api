@@ -434,7 +434,7 @@ app.post('/update-balance', async (req, res) => {
 
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
-app.post('/broadcast', async (req, res) => {
+/*app.post('/broadcast', async (req, res) => {
   try {
     // 1. Estandarizar la entrada
     // WoC suele enviar { "txhex": "..." }
@@ -529,6 +529,78 @@ app.post('/broadcast', async (req, res) => {
     return res.status(statusCode).json({ 
       error: errorMsg,
       provider: 'TAAL-ARC-BRIDGE'
+    });
+  }
+});*/
+
+app.post('/broadcast', async (req, res) => {
+  try {
+    // 1. Estandarizar la entrada
+    const txHex = req.body.txhex || req.body.rawTx || req.body.hex;
+    const network = req.body.network || 'main'; // 'main' o 'test'
+
+    if (!txHex || typeof txHex !== 'string') {
+      throw new Error('Falta el hex de la transacción (txhex)');
+    }
+
+    console.log(`[Puente] Recibiendo TX para broadcast via WhatsOnChain (${network})...`);
+
+    // 2. Llamada directa a WhatsOnChain
+    const wocUrl = `https://api.whatsonchain.com/v1/bsv/${network}/tx/raw`;
+    
+    const wocResponse = await axios.post(
+      wocUrl,
+      { txhex: txHex }, // Payload formateado para WoC
+      {
+        headers: {
+          'woc-api-key': WOC_API_KEY, // Opcional, pero recomendado si tienes rate limits
+          'Content-Type': 'application/json'
+        },
+        timeout: 15000 // 15s timeout
+      }
+    );
+
+    // 3. Procesar la respuesta
+    // WoC devuelve el TXID directamente como texto/string en `wocResponse.data` cuando es exitoso
+    const txid = wocResponse.data;
+
+    if (wocResponse.status === 200 && txid) {
+      console.log(`✅ [Puente] Éxito WoC. TXID: ${txid}`);
+      
+      // Ya no necesitamos hacer polling/reintentos. 
+      // Si el POST a WoC fue exitoso, ellos ya la tienen.
+      return res.status(200).send(txid);
+    } else {
+      throw new Error('WoC respondió OK pero respuesta es anómala: ' + JSON.stringify(wocResponse.data));
+    }
+
+  } catch (error) {
+    console.error('❌ [Puente] Error en Broadcast:', error.message);
+
+    // 4. Manejo de Errores adaptado a WoC
+    let errorMsg = 'Error interno en broadcast';
+    let statusCode = 500;
+
+    if (error.response) {
+      // El servidor de WoC rechazó la TX (ej. doble gasto, fee insuficiente, mal formada)
+      statusCode = error.response.status;
+      const wocError = error.response.data;
+      
+      // WoC suele devolver los errores como texto plano o dentro de un objeto JSON
+      errorMsg = typeof wocError === 'string' 
+        ? wocError 
+        : (wocError.error || JSON.stringify(wocError));
+      
+      console.error(`[Puente] Detalle WoC: ${errorMsg}`);
+    } else {
+      // Error de red (timeout, DNS, etc.)
+      errorMsg = error.message;
+    }
+
+    // Devolvemos el error en un formato predecible para tu frontend
+    return res.status(statusCode).json({ 
+      error: errorMsg,
+      provider: 'WOC-BRIDGE'
     });
   }
 });
