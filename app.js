@@ -715,6 +715,10 @@ async function callFirebaseBal(uid, address, returnBalance = false) {
 
 
 
-app.listen(8080, () => {
-  console.log('Servidor API REST escuchando en el puerto indicado');
+// Captura el puerto de la variable de entorno o usa 8080 por defecto
+const port = process.env.PORT || 8080;
+
+// Es fundamental añadir '0.0.0.0' para que Cloud Run detecte el servicio
+app.listen(port, '0.0.0.0', () => {
+  console.log(`Servidor API REST escuchando en el puerto ${port}`);
 });
