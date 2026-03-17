@@ -434,7 +434,8 @@ app.post('/update-balance', async (req, res) => {
 
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
-/*app.post('/broadcast', async (req, res) => {
+/* Using taal */
+app.post('/broadcast', async (req, res) => {
   try {
     // 1. Estandarizar la entrada
     // WoC suele enviar { "txhex": "..." }
@@ -531,7 +532,7 @@ const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
       provider: 'TAAL-ARC-BRIDGE'
     });
   }
-});*/
+});
 
 /* Using WoC
 app.post('/broadcast', async (req, res) => {
@@ -606,7 +607,7 @@ app.post('/broadcast', async (req, res) => {
   }
 });*/
 
-/** Using ARC */
+/** Using ARC 
 const axios = require('axios');
 
 app.post('/broadcast', async (req, res) => {
@@ -631,7 +632,7 @@ app.post('/broadcast', async (req, res) => {
       { rawTx: txHex }, // El payload para ARC. Acepta tanto HEX corto como EF (BIP-239)
       {
         headers: {
-          'Authorization': `Bearer ${process.env.TAAL_API_KEY}`, // Tu llave de console.taal.com
+          'Authorization': `Bearer ${TAAL_API_KEY}`, // Tu llave de console.taal.com
           'Content-Type': 'application/json',
           'X-WaitForStatus': '3', // ARC esperará hasta que la transacción sea 'SEEN_IN_MEMPOOL' (3) o superior
           'X-SkipFeeCheck': 'false' // Asegura que ARC valide el fee y no rebote luego
@@ -681,7 +682,7 @@ app.post('/broadcast', async (req, res) => {
       provider: 'TAAL-ARC-BRIDGE'
     });
   }
-});
+});*/
 
 
 async function callFirebaseBal(uid, address, returnBalance = false) {
