@@ -654,6 +654,12 @@ app.post('/broadcast', async (req, res) => {
     }
 
   } catch (error) {
+    if (error.response) {
+      // ESTO ES LO QUE NECESITAMOS VER
+      console.error('DETALLE DE ERROR ARC:', JSON.stringify(error.response.data));
+      return res.status(error.response.status).json(error.response.data);
+    }
+    
     console.error('❌ [Puente ARC] Error en Broadcast:', error.message);
 
     // 5. Manejo de Errores detallado (Traducción de errores de ARC)
