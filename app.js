@@ -434,7 +434,7 @@ app.post('/update-balance', async (req, res) => {
 
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
-/* Using taal */
+/* Using taal 
 app.post('/broadcast', async (req, res) => {
   try {
     // 1. Estandarizar la entrada
@@ -532,7 +532,7 @@ app.post('/broadcast', async (req, res) => {
       provider: 'TAAL-ARC-BRIDGE'
     });
   }
-});
+});*/
 
 /* Using WoC
 app.post('/broadcast', async (req, res) => {
@@ -607,8 +607,7 @@ app.post('/broadcast', async (req, res) => {
   }
 });*/
 
-/** Using ARC 
-const axios = require('axios');
+/** Using ARC */
 
 app.post('/broadcast', async (req, res) => {
   try {
@@ -682,7 +681,7 @@ app.post('/broadcast', async (req, res) => {
       provider: 'TAAL-ARC-BRIDGE'
     });
   }
-});*/
+});
 
 
 async function callFirebaseBal(uid, address, returnBalance = false) {
