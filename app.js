@@ -533,6 +533,7 @@ const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
   }
 });*/
 
+/* Using WoC
 app.post('/broadcast', async (req, res) => {
   try {
     // 1. Estandarizar la entrada
@@ -601,6 +602,83 @@ app.post('/broadcast', async (req, res) => {
     return res.status(statusCode).json({ 
       error: errorMsg,
       provider: 'WOC-BRIDGE'
+    });
+  }
+});*/
+
+/** Using ARC */
+const axios = require('axios');
+
+app.post('/broadcast', async (req, res) => {
+  try {
+    // 1. Estandarizar la entrada
+    const txHex = req.body.txhex || req.body.rawTx || req.body.hex;
+    const network = req.body.network || 'main'; // ARC suele usar mainnet
+
+    if (!txHex || typeof txHex !== 'string') {
+      throw new Error('Falta el hex de la transacción (txhex/rawTx)');
+    }
+
+    // 2. Log Incial: Saber si viene extendido (EF) o corto (Raw normal)
+    console.log(`[Puente ARC] Recibiendo TX de longitud ${txHex.length}...`);
+
+    // 3. Llamada a TAAL ARC (Teranode)
+    // endpoint de mainnet de Taal
+    const arcUrl = 'https://arc.taal.com/v1/tx'; 
+
+    const arcResponse = await axios.post(
+      arcUrl,
+      { rawTx: txHex }, // El payload para ARC. Acepta tanto HEX corto como EF (BIP-239)
+      {
+        headers: {
+          'Authorization': `Bearer ${process.env.TAAL_API_KEY}`, // Tu llave de console.taal.com
+          'Content-Type': 'application/json',
+          'X-WaitForStatus': '3', // ARC esperará hasta que la transacción sea 'SEEN_IN_MEMPOOL' (3) o superior
+          'X-SkipFeeCheck': 'false' // Asegura que ARC valide el fee y no rebote luego
+        },
+        timeout: 15000 // 15s timeout
+      }
+    );
+
+    // 4. Procesar la respuesta
+    const arcData = arcResponse.data;
+
+    // ARC devuelve status 200 con un objeto que contiene txid y txStatus
+    if (arcResponse.status === 200 && arcData.txid) {
+      console.log(`✅ [Puente ARC] Éxito. TXID: ${arcData.txid} | Estado: ${arcData.txStatus}`);
+      
+      // Enviamos el TXID directamente de vuelta al cliente
+      return res.status(200).send(arcData.txid);
+    } else {
+      throw new Error('ARC respondió OK pero sin TXID: ' + JSON.stringify(arcData));
+    }
+
+  } catch (error) {
+    console.error('❌ [Puente ARC] Error en Broadcast:', error.message);
+
+    // 5. Manejo de Errores detallado (Traducción de errores de ARC)
+    let errorMsg = 'Error interno en broadcast';
+    let statusCode = 500;
+
+    if (error.response) {
+      // El servidor de ARC respondió con un error (4xx, 5xx)
+      statusCode = error.response.status;
+      const arcError = error.response.data;
+      
+      // ARC suele devolver detalles en 'extraInfo' o 'title' o 'detail'
+      // Esto es crucial para entender el error de "parent-tx-below-min-relay-fee" (Ancestros)
+      errorMsg = arcError.extraInfo || arcError.title || arcError.detail || JSON.stringify(arcError);
+      
+      console.error(`[Puente ARC] Detalle ARC: ${errorMsg}`);
+    } else {
+      // Error de red, timeout, DNS, etc.
+      errorMsg = error.message;
+    }
+
+    // Devolvemos el error en un formato que tu frontend pueda leer
+    return res.status(statusCode).json({ 
+      error: errorMsg,
+      provider: 'TAAL-ARC-BRIDGE'
     });
   }
 });
