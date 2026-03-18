@@ -619,6 +619,11 @@ app.post('/broadcast', async (req, res) => {
       throw new Error('Falta el hex de la transacción (txhex/rawTx)');
     }
 
+    // --- 3P2 DEBUG: COPIA ESTE HEX DE LOS LOGS ---
+    console.log(`[3P2-DEBUG] HEX A ENVIAR: ${txHex}`);
+    console.log(`[3P2-DEBUG] Longitud: ${txHex.length} | API Key inicia con: ${TAAL_API_KEY?.substring(0, 5)}...`);
+    // --------------------------------------------
+
     // 2. Log Incial: Saber si viene extendido (EF) o corto (Raw normal)
     console.log(`[Puente ARC] Recibiendo TX de longitud ${txHex.length}...`);
 
