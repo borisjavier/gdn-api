@@ -265,9 +265,10 @@ app.get('/v1/rates/batch', async (req, res) => {
     }
 });
 
-app.get('/balance/:address/uid/:uid', async (req, res) => {
+app.post('/balance/:address/uid/:uid', async (req, res) => {
     const { address, uid } = req.params;
-    console.log(`Address: ${address}, uid: ${uid}`)
+    const { cp = '' } = req.body || {};
+    console.log(`Address: ${address}, uid: ${uid}, Modo: ${cp ? 'Non-Custodial' : 'Custodial'}`);
     //const { uid } = req.query; // Necesitamos el UID para que Functions sepa de quién es la clave
 
     try {
@@ -287,7 +288,7 @@ app.get('/balance/:address/uid/:uid', async (req, res) => {
         const functionUrl = 'https://us-central1-goldennotes-app.cloudfunctions.net/app/mov';
         
         try {
-            const response = await axios.post(functionUrl, { uid, dir: address });
+            const response = await axios.post(functionUrl, { uid, dir: address, cp });
             const dt = response.data;
 
             if (dt && dt.balance !== undefined) {
